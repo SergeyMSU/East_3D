@@ -49,7 +49,28 @@ int sign(double x)
 
 int main()
 {
+	Setka B = Setka("vers_7");
+	//B.Download_MHD("Vers_1.txt");
+	//B.Cut_Plane_y_Tecplot(1.0);
+	//B.Cut_Plane_y(1.0);
+	//B.Cut_Surface();
+	//exit(-1);
+	//B.Calc_normal();
+	B.Reconstruct_medium2();
+	B.Reconstruct_medium2();
+	B.Reconstruct_medium2();
+	B.Zapusk();
+	B.Save_setka("vers_11");
+	B.Cut_Plane_z(1.0);
+	B.Cut_Plane_y(1.0);
+	B.Cut_Surface();
+	B.Cut_Plane_z_Tecplot(1.0);
+	B.Cut_Plane_y_Tecplot(1.0);
+	exit(-1);
+
 	Setka A = Setka();
+	A.Construct_start();
+	A.save_soseds();
 	//A.HLLD_Test();
 	//return 0;
 	A.Add_couple_start();
@@ -61,13 +82,13 @@ int main()
 	A.Reconstruct_couple();
 	A.Reconstruct_couple(true);
 	A.set_normal();
-	A.move_par();
+	//A.move_par();
 	A.Reconstruct_couple();
 	A.Reconstruct_couple();
 	A.Reconstruct_couple();
 	A.Calc_normal();
 	A.Reconstruct_couple();
-
+	A.Reconstruct_medium2();
 
 	A.Cut_Plane_z(1.0);
 	A.Cut_Plane_y(1.0);
@@ -76,15 +97,18 @@ int main()
 	A.Init();
 	A.Download_MHD("Vers_1.txt");
 	//A.Go_MHD(30);
-	A.Calc_normal();                           // Проверить в самом начала, мне кажется там что-то не правильно
-	A.Start_MHD(100);
+	//A.Calc_normal();                           // Проверить в самом начала, мне кажется там что-то не правильно
+	//A.Start_MHD(100);
+	//A.Zapusk();
 	//A.Reconstruct_couple();
 	A.Cut_Plane_z_Tecplot(1.0);
 	A.Cut_Plane_y_Tecplot(1.0);
-	A.Save_MHD("Vers_2.txt");
+	//A.Save_MHD("Vers_2.txt");
 	A.Cut_Plane_z(1.0);
 	A.Cut_Plane_y(1.0);
 	A.Cut_Surface();
+
+	A.Save_setka("vers_1");
 
 	/*for (auto& i : A.All_Cell[80000]->Grans)
 	{

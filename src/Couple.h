@@ -16,6 +16,7 @@ public:
 	double n1;
 	double n2;
 	double n3;
+	double d_sosed;
 	int number = -1;
 
 	Couple(Cell* A1, Cell* A2, const double& dist);

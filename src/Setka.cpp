@@ -15,6 +15,19 @@
 using namespace std;
 using namespace voro;
 
+Setka::Setka(string name)
+{
+    cout << "Start  read  " << name << endl;
+    this->initialization();
+    this->Download_setka(name);
+    this->renumber();
+
+    this->Initialization_do_MHD();
+    //this->Calc_normal();
+    this->Reconstruct_medium2();
+    cout << "End  read  " << name << endl;
+}
+
 Setka::Setka()
 {
 	this->initialization();
@@ -118,6 +131,8 @@ Setka::Setka()
 	}
 
 	cout << "All_points = " << ik - 1 << endl;
+
+
 }
 
 void Setka::renumber(void)
@@ -481,7 +496,6 @@ void Setka::Disable_cells(void)
                     {
                         j->Sosed->include_ = false;
                         j->Sosed->reconstruct_ = true;
-                        this->All_Cell_off.push_back(j->Sosed);
                         for (auto& k : j->Sosed->Grans)
                         {
                             k->Sosed->reconstruct_ = true;
@@ -503,7 +517,6 @@ void Setka::Disable_cells(void)
                     {
                         j->Sosed->include_ = false;
                         j->Sosed->reconstruct_ = true;
-                        this->All_Cell_off.push_back(j->Sosed);
                         for (auto& k : j->Sosed->Grans)
                         {
                             k->Sosed->reconstruct_ = true;
@@ -511,6 +524,470 @@ void Setka::Disable_cells(void)
                     }
                 }
             }
+        }
+    }
+}
+
+void Setka::Save_setka(string name)
+{
+    cout << "Save setka  " << name << endl;
+    ofstream fout;
+    string namef = "Setka_" + name + ".txt";
+    fout.open(namef);
+
+    fout << this->All_Cell.size() << endl;
+    for (auto& i : this->All_Cell)
+    {
+        fout << i->Center->x << " " << i->Center->y << " " << i->Center->z << endl;
+        fout << i->type << " " << i->couple_ << " " << i->include_ << endl;
+    }
+
+    fout << this->All_Couple.size() << endl;
+    for (auto& i : this->All_Couple)
+    {
+        fout << i->dist << " " << i->A1->number << " " << i->A2->number << endl;
+    }
+
+    for (auto& i : this->All_Cell)
+    {
+        if (i->include_ == false)
+        {
+            i->Grans.clear();
+        }
+        fout << i->Grans.size() << endl;
+        for (auto& j : i->Grans)
+        {
+            fout << j->Sosed->number << endl;
+        }
+
+        fout << i->Grans_standart.size() << endl;
+        for (auto& j : i->Grans_standart)
+        {
+            fout << j->number << endl;
+        }
+    }
+
+    this->Save_MHD("MHD_" + name + ".txt");
+}
+
+void Setka::Download_setka(string name)
+{
+    ifstream fout;
+    string namef = "Setka_" + name + ".txt";
+    fout.open(namef);
+
+    int N = 0;
+    double x, y, z;
+    int type;
+    fout >> N;
+    for (int i = 0; i < N; i++)
+    {
+        fout >> x >> y >> z;
+        auto A = new Cell(x, y, z);
+        fout >> type >>  A->couple_ >> A->include_;
+        A->type = static_cast<Cell_type>(type);
+        this->All_Cell.push_back(A);
+    }
+
+    int nk = 0;
+    for (auto& i : this->All_Cell)
+    {
+        i->number = nk;
+        nk++;
+    }
+
+    fout >> N;
+    double d;
+    int a, b;
+    for (int i = 0; i < N; i++)
+    {
+        fout >> d >> a >> b;
+        auto A = new Couple(this->All_Cell[a], this->All_Cell[b], d);
+        this->All_Cell[a]->Par = A;
+        this->All_Cell[b]->Par = A;
+        A->Resolve();
+        this->All_Couple.push_back(A);
+    }
+
+    nk = 0;
+    for (auto& i : this->All_Couple)
+    {
+        i->number = nk;
+        nk++;
+    }
+
+    for (auto& i : this->All_Cell)
+    {
+        int ni;
+        fout >> ni;
+        for (int j = 0; j < ni; j++)
+        {
+            fout >> a;
+            if (a >= 0)
+            {
+                    i->Candidates.push_back(this->All_Cell[a]);
+            }
+            else if (a == -1)
+                {
+                    i->Candidates.push_back(this->Wall1);
+                }
+            else if (a == -2)
+                {
+                    i->Candidates.push_back(this->Wall2);
+                }
+            else if (a == -3)
+                {
+                    i->Candidates.push_back(this->Wall3);
+                }
+            else if (a == -4)
+                {
+                    i->Candidates.push_back(this->Wall4);
+                }
+            else if (a == -5)
+                {
+                    i->Candidates.push_back(this->Wall5);
+                }
+            else if (a == -6)
+                {
+                    i->Candidates.push_back(this->Wall6);
+                }
+            else if (a == -7)
+                {
+                     i->Candidates.push_back(this->Wall7);
+                }
+        }
+
+        fout >> ni;
+        for (int j = 0; j < ni; j++)
+        {
+            fout >> a;
+
+            if (a >= 0)
+            {
+                i->Grans_standart.push_back(this->All_Cell[a]);
+            }
+            else if (a == -1)
+            {
+                i->Grans_standart.push_back(this->Wall1);
+            }
+            else if (a == -2)
+            {
+                i->Grans_standart.push_back(this->Wall2);
+            }
+            else if (a == -3)
+            {
+                i->Grans_standart.push_back(this->Wall3);
+            }
+            else if (a == -4)
+            {
+                i->Grans_standart.push_back(this->Wall4);
+            }
+            else if (a == -5)
+            {
+                i->Grans_standart.push_back(this->Wall5);
+            }
+            else if (a == -6)
+            {
+                i->Grans_standart.push_back(this->Wall6);
+            }
+            else if (a == -7)
+            {
+                i->Grans_standart.push_back(this->Wall7);
+            }
+        }
+    }
+
+    this->Download_MHD("MHD_" + name + ".txt");
+
+    this->Construct_fast();
+}
+
+void Setka::include_cells(void)
+{
+    int kj = 0;
+    for (auto& i : this->All_Cell)
+    {
+        if (i->include_ == false && i->couple_ == false)
+        {
+            for (auto& j : i->Grans)
+            {
+                delete j;
+            }
+            i->Grans.clear();
+
+            bool b1 = true;
+            bool b2 = false;
+            double c1, c2, c3;
+            double x1, x2, x3;
+            double dist;
+            i->Center->get(x1, x2, x3);
+            for (auto& j : i->Grans_standart)
+            {
+                if (j->include_ == true && j->type == C_base)
+                {
+                    b2 = true;
+                    if (j->couple_ == true)
+                    {
+                        j->Center->get(c1, c2, c3);
+                        dist = sqrt(kv(c1 - x1) + kv(c2 - x2) + kv(c3 - x3));
+                        if (dist <= j->Par->d_sosed * 1.5)
+                        {
+                            b1 = false;
+                            break;
+                        }
+                    }
+
+                    for (auto& k : j->Grans)
+                    {
+                        if (k->Sosed->couple_ == true)
+                        {
+                            k->Sosed->Center->get(c1, c2, c3);
+                            dist = sqrt(kv(c1 - x1) + kv(c2 - x2) + kv(c3 - x3));
+                            if (dist <= k->Sosed->Par->d_sosed * 1.5)
+                            {
+                                b1 = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (b1 == true && b2 == true)
+            {
+                kj++;
+                i->include_ = true;
+                i->i_init_mgd = true;
+                i->near_par = true;
+                for (auto& j : i->Grans_standart)
+                {
+                    if (j->include_ == true)
+                    {
+                        j->Candidates.push_back(i);
+                        i->Candidates.push_back(j);
+                    }
+                }
+            }
+        }
+    }
+
+    cout << "Vklucheno  " << kj << "  yacheek" << endl;
+}
+
+void Setka::exclude_cells(void)
+{
+    cout << "EXCLUDE" << endl;
+    int kj = 0;
+    double x, y, z;
+    double x2, y2, z2;
+    for (auto& i : this->All_Cell)
+    {
+        if (i->include_ == true && i->couple_ != true)
+        {
+            for (auto& j : i->Grans)
+            {
+                if (j->Sosed->include_ == true && j->Sosed->couple_ == true && j->Sosed->type == C_base)
+                {
+                    i->Center->get(x, y, z);
+                    j->Sosed->Center->get(x2, y2, z2);
+                    if (sqrt(kv(x - x2) + kv(y - y2) + kv(z - z2)) <= j->Sosed->Par->d_sosed * 1.5)
+                    {
+                        kj++;
+                        i->include_ = false;                    // Выключаем ячейку
+                        i->i_include_candidate = false;
+                        break;
+                    }
+                }
+            }
+
+        }
+    }
+
+    cout << "Viklucheno  " << kj << "  yacheek" << endl;
+}
+
+void Setka::save_soseds()
+{
+    cout << "Save soseds" << endl;
+    for (auto& i : this->All_Cell)
+    {
+        for (auto& j : i->Grans)
+        {
+            i->Grans_standart.push_back(j->Sosed);
+        }
+    }
+}
+
+void Setka::Construct_fast(void)
+{
+
+#pragma omp parallel for
+    for (auto& i : this->All_Cell)
+    {
+        if (i->include_ == true)
+        {
+            double x, y, z, r, dd, nx, ny, nz;
+            double A, B, C;
+            voronoicell_neighbor c;
+            vector<int> ney;
+            ney.reserve(30);
+            vector<double> Surf;
+            Surf.reserve(30);
+            vector<double> norm;
+            norm.reserve(3);
+            i->Center->get(x, y, z);
+
+            for (auto& j : i->Grans)
+            {
+                delete j;
+            }
+
+            i->Grans.clear();
+
+
+
+            c.init(-50.0, 50.0, -50.0, 50.0, -50.0, 50.0);
+
+            for (auto& j : i->Candidates)
+            {
+                if (j->type == C_base)
+                {
+                    A = j->Center->x - x;
+                    B = j->Center->y - y;
+                    C = j->Center->z - z;
+                    c.nplane(A, B, C, (A * A + B * B + C * C), j->number);
+                }
+                else if (j == this->Wall1)
+                {
+                    c.nplane(2.0 * (x_max - x), 0.0, 0.0, -1);
+                }
+                else if (j == this->Wall2)
+                {
+                    c.nplane(2.0 * (x_min - x), 0.0, 0.0, -2);
+                }
+                else if (j == this->Wall3)
+                {
+                    c.nplane(0.0, 2.0 * (y_max - y), 0.0, -3);
+                }
+                else if (j == this->Wall4)
+                {
+                    c.nplane(0.0, 2.0 * (y_min - y), 0.0, -4);
+                }
+                else if (j == this->Wall5)
+                {
+                    c.nplane(0.0, 0.0, 2.0 * (z_max - z), -5);
+                }
+                else if (j == this->Wall6)
+                {
+                    c.nplane(0.0, 0.0, 2.0 * (z_min - z), -6);
+                }
+                else if (j == this->Wall7)
+                {
+                    r = sqrt(kv(x) + kv(y) + kv(z));
+                    dd = r - (this->sl_L - 0.01 * RR_);
+                    nx = x / r;
+                    ny = y / r;
+                    nz = z / r;
+                    c.nplane(-2.0 * dd * nx, -2.0 * dd * ny, -2.0 * dd * nz, -7);
+                }
+                else
+                {
+                    cout << "ERROR  395  Setka  wcewexdwadfeacefhfjkhgefyuevy34u54" << endl;
+                }
+            }
+
+
+
+            c.neighbors(ney); // Получаем список номеров соседей по порядку
+            c.face_areas(Surf);   // Площади граней
+            c.normals(norm);
+
+            double VV;
+            VV = c.volume();  // Записали объём ячейки
+            i->set_Volume(VV);
+
+            double nn1, nn2, nn3;
+            // Вычисляем движение для пар
+            if (i->couple_ == true)
+            {
+                i->move1 = i->move2 = i->move3 = 0.0;
+                int kkk;
+                for (int j = 0; j < ney.size(); j++)
+                {
+                    if (ney[j] >= 0)
+                    {
+                        kkk = 1;
+                        if (this->All_Cell[ney[j]]->couple_ == true)
+                        {
+                            kkk = 3;
+                        }
+                        nn1 = (this->All_Cell[ney[j]]->Center->x - x) / 2.0;
+                        nn2 = (this->All_Cell[ney[j]]->Center->y - y) / 2.0;
+                        nn3 = (this->All_Cell[ney[j]]->Center->z - z) / 2.0;
+                        i->move1 += Surf[j] * kkk * (nn1) / 3.0;
+                        i->move2 += Surf[j] * kkk * (nn2) / 3.0;
+                        i->move3 += Surf[j] * kkk * (nn3) / 3.0;
+                    }
+                }
+
+                i->move1 = i->move1 / VV;
+                i->move2 = i->move2 / VV;
+                i->move3 = i->move3 / VV;
+            }
+
+
+            for (int j = 0; j < ney.size(); j++)
+            {
+                auto A = new Gran();
+                A->S = Surf[j];              // Площадь грани
+                A->n1 = norm[j * 3];
+                A->n2 = norm[j * 3 + 1];
+                A->n3 = norm[j * 3 + 2];
+
+
+                if (ney[j] >= 0)
+                {
+                    A->Sosed = this->All_Cell[ney[j]];
+                    A->c1 = (x + this->All_Cell[ney[j]]->Center->x) / 2.0;   // Вектор центройда грани
+                    A->c2 = (y + this->All_Cell[ney[j]]->Center->y) / 2.0;
+                    A->c3 = (z + this->All_Cell[ney[j]]->Center->z) / 2.0;
+                }
+                else if (ney[j] == -1)
+                {
+                    A->Sosed = this->Wall1;
+                }
+                else if (ney[j] == -2)
+                {
+                    A->Sosed = this->Wall2;
+                }
+                else if (ney[j] == -3)
+                {
+                    A->Sosed = this->Wall3;
+                }
+                else if (ney[j] == -4)
+                {
+                    A->Sosed = this->Wall4;
+                }
+                else if (ney[j] == -5)
+                {
+                    A->Sosed = this->Wall5;
+                }
+                else if (ney[j] == -6)
+                {
+                    A->Sosed = this->Wall6;
+                }
+                else if (ney[j] == -7)
+                {
+                    A->Sosed = this->Wall7;
+                }
+                else
+                {
+                    cout << "ERROR  395  Setka  hfjkhgefyuevy34u54" << endl;
+                }
+
+                i->Grans.push_back(A);
+            }
+
         }
     }
 }
@@ -1181,35 +1658,15 @@ void Setka::Reconstruct_medium(bool wide)
 
 }
 
-void Setka::Reconstruct_medium2(bool wide)
+bool Setka::Reconstruct_medium2(bool wide)
 {
-    // Другой подход, добавляем всех соседей с повторениями потом просто режем ячейки. Это работает немного быстрее.
-
-    // wide = false - перестроиваем парные и их соседей.
-    // wide = true - перестриваем парные и их соседей до 2 уровня включительно
-
-    // Добавляем кандидатов для ячеек
-    // При этом для парных добавляем соседей-соседей без повторения
+    // Перестроение ВСЕЙ (не только соседних с парами) сетки!!!
+    // Добавляем соседей-соседей и строим
 
     for (auto& i : this->All_Cell)
     {
         if (i->include_ == true)
         {
-            bool bbb = false;
-            if (wide == false)
-            {
-                bbb = i->near_par || i->couple_;
-            }
-            else
-            {
-                bbb = i->near_par || i->near_par_2 || i->couple_;
-            }
-
-            if (bbb == false)
-            {
-                continue;
-            }
-
             i->Candidates.clear();
 
             for (auto& j : i->Grans)
@@ -1217,27 +1674,31 @@ void Setka::Reconstruct_medium2(bool wide)
                 if (j->Sosed->number != i->number && j->Sosed->include_ == true)
                 {
                     i->Candidates.push_back(j->Sosed);
+                    j->Sosed->Candidates.push_back(i);
                 }
             }
+
+            for (auto& jj : i->Grans)
+            {
+                for (auto& j : jj->Sosed->Grans)
+                {
+                    if (j->Sosed->number != i->number && j->Sosed->include_ == true)
+                    {
+                        i->Candidates.push_back(j->Sosed);
+                    }
+                }
+            }
+
             
         }
     }
 
     // Вычисляем парные ячейки, при этом добавляем кандидатов в обычные от парных
+    bool bkl = true;
 #pragma omp parallel for
     for (auto& i : this->All_Cell)
     {
-        bool bbb = false;
-        if (wide == false)
-        {
-            bbb = i->near_par || i->couple_;
-        }
-        else
-        {
-            bbb = i->near_par || i->near_par_2 || i->couple_;
-        }
-
-        if (i->include_ == true && bbb == true)
+        if (i->include_ == true)
         {
             double x, y, z, r, dd, nx, ny, nz;
             double A, B, C;
@@ -1249,10 +1710,9 @@ void Setka::Reconstruct_medium2(bool wide)
             vector<double> norm;
             norm.reserve(3);
             i->Center->get(x, y, z);
-            i->Candidates.clear();
+            int nkl = i->Grans.size();
             for (auto& j : i->Grans)
             {
-                i->Candidates.push_back(j->Sosed);
                 delete j;
             }
 
@@ -1261,6 +1721,7 @@ void Setka::Reconstruct_medium2(bool wide)
 
 
             c.init(-50.0, 50.0, -50.0, 50.0, -50.0, 50.0);
+
 
             for (auto& j : i->Candidates)
             {
@@ -1306,325 +1767,9 @@ void Setka::Reconstruct_medium2(bool wide)
                 }
                 else
                 {
-                    cout << "ERROR  395  Setka  wcewexdwadfeacefhfjkhgefyuevy34u54" << endl;
+                    cout << "ERROR  3ewd  Setka  wcewdwedewdewazxczxdwadfeacefhfjkhgefyuevy34u54" << endl;
                 }
             }
-
-            for (auto& jj : i->Candidates)
-            {
-                for (auto& j : jj->Candidates)
-                {
-                    if (j->number != i->number)
-                    {
-                        if (j->type == C_base)
-                        {
-                            A = j->Center->x - x;
-                            B = j->Center->y - y;
-                            C = j->Center->z - z;
-                            c.nplane(A, B, C, (A * A + B * B + C * C), j->number);
-                        }
-                        else if (j == this->Wall1)
-                        {
-                            c.nplane(2.0 * (x_max - x), 0.0, 0.0, -1);
-                        }
-                        else if (j == this->Wall2)
-                        {
-                            c.nplane(2.0 * (x_min - x), 0.0, 0.0, -2);
-                        }
-                        else if (j == this->Wall3)
-                        {
-                            c.nplane(0.0, 2.0 * (y_max - y), 0.0, -3);
-                        }
-                        else if (j == this->Wall4)
-                        {
-                            c.nplane(0.0, 2.0 * (y_min - y), 0.0, -4);
-                        }
-                        else if (j == this->Wall5)
-                        {
-                            c.nplane(0.0, 0.0, 2.0 * (z_max - z), -5);
-                        }
-                        else if (j == this->Wall6)
-                        {
-                            c.nplane(0.0, 0.0, 2.0 * (z_min - z), -6);
-                        }
-                        else if (j == this->Wall7)
-                        {
-                            r = sqrt(kv(x) + kv(y) + kv(z));
-                            dd = r - (this->sl_L - 0.01 * RR_);
-                            nx = x / r;
-                            ny = y / r;
-                            nz = z / r;
-                            c.nplane(-2.0 * dd * nx, -2.0 * dd * ny, -2.0 * dd * nz, -7);
-                        }
-                        else
-                        {
-                            cout << "ERROR  3ewd  Setka  wcewdwedewdewazxczxdwadfeacefhfjkhgefyuevy34u54" << endl;
-                        }
-                    }
-                }
-            }
-
-
-
-            c.neighbors(ney); // Получаем список номеров соседей по порядку
-            c.face_areas(Surf);   // Площади граней
-            c.normals(norm);
-
-            double VV;
-            VV = c.volume();  // Записали объём ячейки
-            i->set_Volume(VV);
-
-            double nn1, nn2, nn3;
-            // Вычисляем движение для пар
-            if (true)
-            {
-                i->move1 = i->move2 = i->move3 = 0.0;
-                int kkk;
-                for (int j = 0; j < ney.size(); j++)
-                {
-                    if (ney[j] >= 0)
-                    {
-                        kkk = 1;
-                        if (this->All_Cell[ney[j]]->couple_ == true)
-                        {
-                            kkk = 3;
-                        }
-                        nn1 = (this->All_Cell[ney[j]]->Center->x - x) / 2.0;
-                        nn2 = (this->All_Cell[ney[j]]->Center->y - y) / 2.0;
-                        nn3 = (this->All_Cell[ney[j]]->Center->z - z) / 2.0;
-                        i->move1 += Surf[j] * kkk * (nn1) / 3.0;
-                        i->move2 += Surf[j] * kkk * (nn2) / 3.0;
-                        i->move3 += Surf[j] * kkk * (nn3) / 3.0;
-                    }
-                }
-
-                i->move1 = i->move1 / VV;
-                i->move2 = i->move2 / VV;
-                i->move3 = i->move3 / VV;
-            }
-
-
-            for (int j = 0; j < ney.size(); j++)
-            {
-                auto A = new Gran();
-                A->S = Surf[j];              // Площадь грани
-                A->n1 = norm[j * 3];
-                A->n2 = norm[j * 3 + 1];
-                A->n3 = norm[j * 3 + 2];
-
-
-                if (ney[j] >= 0)
-                {
-                    // Блок добавления текущей ячейки как соседа к обычной, которая есть сосед текущей парной
-                    if (true)
-                    {
-                        if (this->All_Cell[ney[j]]->couple_ == false)
-                        {
-                            bool bnt = false;
-                            for (auto& bi : this->All_Cell[ney[j]]->Candidates)
-                            {
-                                if (bi->number == i->number)
-                                {
-                                    bnt = true;
-                                    break;
-                                }
-                            }
-
-                            if (bnt == false)
-                            {
-                                this->All_Cell[ney[j]]->Candidates.push_back(i);
-                            }
-                        }
-                    }
-
-                    A->Sosed = this->All_Cell[ney[j]];
-                    A->c1 = (x + this->All_Cell[ney[j]]->Center->x) / 2.0;   // Вектор центройда грани
-                    A->c2 = (y + this->All_Cell[ney[j]]->Center->y) / 2.0;
-                    A->c3 = (z + this->All_Cell[ney[j]]->Center->z) / 2.0;
-                }
-                else if (ney[j] == -1)
-                {
-                    A->Sosed = this->Wall1;
-                }
-                else if (ney[j] == -2)
-                {
-                    A->Sosed = this->Wall2;
-                }
-                else if (ney[j] == -3)
-                {
-                    A->Sosed = this->Wall3;
-                }
-                else if (ney[j] == -4)
-                {
-                    A->Sosed = this->Wall4;
-                }
-                else if (ney[j] == -5)
-                {
-                    A->Sosed = this->Wall5;
-                }
-                else if (ney[j] == -6)
-                {
-                    A->Sosed = this->Wall6;
-                }
-                else if (ney[j] == -7)
-                {
-                    A->Sosed = this->Wall7;
-                }
-                else
-                {
-                    cout << "ERROR  395  Setka  hfjkhgefyuevy34u54" << endl;
-                }
-
-                i->Grans.push_back(A);
-            }
-
-        }
-    }
-
-}
-
-void Setka::Reconstruct_medium3(bool wide)
-{
-    // wide = false - перестроиваем парные и их соседей.
-    // wide = true - перестриваем парные и их соседей до 2 уровня включительно
-
-    // Добавляем кандидатов для ячеек
-    // При этом для парных добавляем соседей-соседей без повторения
-
-    // Обнулим маячок
-    bool bbb;
-
-    //cout << "A1" << endl;
-    for (auto& i : this->All_Cell)
-    {
-        i->i_bbb = false;
-        if (i->include_ == true)
-        {
-            bbb = false;
-            if (wide == false)
-            {
-                bbb = i->near_par || i->couple_;
-            }
-            else
-            {
-                bbb = i->near_par || i->near_par_2 || i->couple_;
-            }
-            i->i_bbb = bbb;
-            if (bbb == false)
-            {
-                continue;
-            }
-
-            for (auto& j : i->Grans)
-            {
-                if (j->Sosed->type == C_base)
-                {
-                    i->Candidates.push_back(j->Sosed);
-                }
-            }
-        }
-    }
-
-    for (auto& i : this->All_Cell)
-    {
-        if (i->include_ == true)
-        {
-            for (auto& j : i->Grans)
-            {
-                j->Sosed->i_sosed = false;
-                for (auto& k : j->Sosed->Grans)
-                {
-                    k->Sosed->i_sosed = false;
-                }
-
-                if (j->Sosed->i_boundary_1 == true)
-                {
-                    i->i_boundary_2 = true;
-                }
-            }
-
-            for (auto& j : i->Grans)
-            {
-                j->Sosed->i_sosed = true;
-            }
-
-            for (auto& j : i->Grans)
-            {
-                if (j->Sosed->type == C_base)
-                {
-                    for (auto& k : j->Sosed->Grans)
-                    {
-                        if (k->Sosed->type == C_base && k->Sosed->i_sosed == false)
-                        {
-                            k->Sosed->i_sosed = true;
-                            if (k->Sosed->i_bbb == true)
-                            {
-                                k->Sosed->Candidates.push_back(i);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    //cout << "A2" << endl;
-
-    // Вычисляем парные ячейки, при этом добавляем кандидатов в обычные от парных
-    //cout << "B1" << endl;
-#pragma omp parallel for
-    for (auto& i : this->All_Cell)
-    {
-        if (i->include_ == true)
-        {
-            if (i->i_bbb == false)
-            {
-                continue;
-            }
-
-            double x, y, z, r, dd, nx, ny, nz;
-            double A, B, C;
-            voronoicell_neighbor c;
-            vector<int> ney;
-            ney.reserve(30);
-            vector<double> Surf;
-            Surf.reserve(30);
-            vector<double> norm;
-            norm.reserve(3);
-            i->Center->get(x, y, z);
-
-            for (auto& j : i->Grans)
-            {
-                delete j;
-            }
-
-            i->Grans.clear();
-
-
-
-            c.init(-50.0, 50.0, -50.0, 50.0, -50.0, 50.0);
-
-            for (auto& j : i->Candidates)
-            {
-                if (j->type == C_base)
-                {
-                    A = j->Center->x - x;
-                    B = j->Center->y - y;
-                    C = j->Center->z - z;
-                    c.nplane(A, B, C, (A * A + B * B + C * C), j->number);
-                }
-            }
-
-
-            if (i->i_boundary_1 || i->i_boundary_2)
-            {
-                c.nplane(2.0 * (x_max - x), 0.0, 0.0, -1);
-                c.nplane(2.0 * (x_min - x), 0.0, 0.0, -2);
-                c.nplane(0.0, 2.0 * (y_max - y), 0.0, -3);
-                c.nplane(0.0, 2.0 * (y_min - y), 0.0, -4);
-                c.nplane(0.0, 0.0, 2.0 * (z_max - z), -5);
-                c.nplane(0.0, 0.0, 2.0 * (z_min - z), -6);
-            }
-
 
 
 
@@ -1718,9 +1863,519 @@ void Setka::Reconstruct_medium3(bool wide)
                 i->Grans.push_back(A);
             }
 
+            if (nkl != i->Grans.size())
+            {
+                bkl = false;
+            }
+        }
+    }
+    return bkl;
+}
+
+bool Setka::Reconstruct_medium3(bool wide)
+{
+    // wide = false - перестроиваем парные и их соседей.
+    // wide = true - перестриваем парные и их соседей до 2 уровня включительно
+
+    // Добавляем кандидатов для ячеек
+    // Добавляем соседей-соседей по алгоритму без повторений, но ВСЁ ТОЛЬКО для ячеек близких к разрыву
+
+    // Обнулим маячок
+    bool bbb;
+
+    //cout << "A1" << endl;
+    for (auto& i : this->All_Cell)
+    {
+        i->i_bbb = false;
+        if (i->include_ == true)
+        {
+            bbb = false;
+            if (wide == false)
+            {
+                bbb = i->near_par || i->couple_;
+            }
+            else
+            {
+                bbb = i->near_par || i->near_par_2 || i->couple_;
+            }
+            i->i_bbb = bbb;
+            if (bbb == false)
+            {
+                continue;
+            }
+
+            for (auto& j : i->Grans)
+            {
+                if (j->Sosed->type == C_base && j->Sosed->include_ == true)
+                {
+                    i->Candidates.push_back(j->Sosed);
+                }
+            }
+        }
+    }
+
+    for (auto& i : this->All_Cell)
+    {
+        if (i->include_ == true)
+        {
+            for (auto& j : i->Grans)
+            {
+                j->Sosed->i_sosed = false;
+                for (auto& k : j->Sosed->Grans)
+                {
+                    k->Sosed->i_sosed = false;
+                }
+
+                if (j->Sosed->i_boundary_1 == true)
+                {
+                    i->i_boundary_2 = true;
+                }
+            }
+
+            for (auto& j : i->Grans)
+            {
+                j->Sosed->i_sosed = true;
+            }
+
+            for (auto& j : i->Grans)
+            {
+                if (j->Sosed->type == C_base)
+                {
+                    for (auto& k : j->Sosed->Grans)
+                    {
+                        if (k->Sosed->type == C_base && k->Sosed->i_sosed == false && k->Sosed->include_ == true)
+                        {
+                            k->Sosed->i_sosed = true;
+                            if (k->Sosed->i_bbb == true)
+                            {
+                                k->Sosed->Candidates.push_back(i);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    //cout << "A2" << endl;
+
+    // Вычисляем парные ячейки, при этом добавляем кандидатов в обычные от парных
+    //cout << "B1" << endl;
+    bool bkl = true;
+#pragma omp parallel for
+    for (auto& i : this->All_Cell)
+    {
+        if (i->include_ == true)
+        {
+            if (i->i_bbb == false)
+            {
+                continue;
+            }
+
+            double x, y, z, r, dd, nx, ny, nz;
+            double A, B, C;
+            voronoicell_neighbor c;
+            vector<int> ney;
+            ney.reserve(30);
+            vector<double> Surf;
+            Surf.reserve(30);
+            vector<double> norm;
+            norm.reserve(3);
+            i->Center->get(x, y, z);
+            int bnl = i->Grans.size();
+            int bnl2 = 0;
+            for (auto& j : i->Grans)
+            {
+                bnl2 = bnl2 + j->Sosed->number;
+                delete j;
+            }
+
+            i->Grans.clear();
+
+
+
+            c.init(-50.0, 50.0, -50.0, 50.0, -50.0, 50.0);
+
+            for (auto& j : i->Candidates)
+            {
+
+                if (j->type == C_base)
+                {
+                    if (j->include_ == false)
+                    {
+                        cout << "no include sfinefrlerf" << endl;
+                    }
+
+                    A = j->Center->x - x;
+                    B = j->Center->y - y;
+                    C = j->Center->z - z;
+                    c.nplane(A, B, C, (A * A + B * B + C * C), j->number);
+                }
+            }
+
+
+            if (i->i_boundary_1 || i->i_boundary_2)
+            {
+                c.nplane(2.0 * (x_max - x), 0.0, 0.0, -1);
+                c.nplane(2.0 * (x_min - x), 0.0, 0.0, -2);
+                c.nplane(0.0, 2.0 * (y_max - y), 0.0, -3);
+                c.nplane(0.0, 2.0 * (y_min - y), 0.0, -4);
+                c.nplane(0.0, 0.0, 2.0 * (z_max - z), -5);
+                c.nplane(0.0, 0.0, 2.0 * (z_min - z), -6);
+            }
+
+
+
+
+            c.neighbors(ney); // Получаем список номеров соседей по порядку
+            c.face_areas(Surf);   // Площади граней
+            c.normals(norm);
+
+            double VV;
+            VV = c.volume();  // Записали объём ячейки
+            i->set_Volume(VV);
+
+            double nn1, nn2, nn3;
+            // Вычисляем движение для пар
+            if (i->couple_ == true)
+            {
+                i->move1 = i->move2 = i->move3 = 0.0;
+                int kkk;
+                int normk = 0;
+                int nk = 0;
+                for (int j = 0; j < ney.size(); j++)
+                {
+                    if (ney[j] >= 0)
+                    {
+                        kkk = 1;
+                        if (this->All_Cell[ney[j]]->couple_ == true)
+                        {
+                            kkk = 1;   // 3
+                        }
+                        nn1 = (this->All_Cell[ney[j]]->Center->x - x) / 2.0;
+                        nn2 = (this->All_Cell[ney[j]]->Center->y - y) / 2.0;
+                        nn3 = (this->All_Cell[ney[j]]->Center->z - z) / 2.0;
+                        i->move1 += Surf[j] * kkk * (nn1) / 3.0;
+                        i->move2 += Surf[j] * kkk * (nn2) / 3.0;
+                        i->move3 += Surf[j] * kkk * (nn3) / 3.0;
+                        normk = normk + kkk;
+                        nk++;
+                    }
+                }
+
+                i->move1 = i->move1 / VV * nk / normk;
+                i->move2 = i->move2 / VV * nk / normk;
+                i->move3 = i->move3 / VV * nk / normk;
+            }
+
+            int bnk2 = 0;
+            for (int j = 0; j < ney.size(); j++)
+            {
+                auto A = new Gran();
+                A->S = Surf[j];              // Площадь грани
+                A->n1 = norm[j * 3];
+                A->n2 = norm[j * 3 + 1];
+                A->n3 = norm[j * 3 + 2];
+
+
+                if (ney[j] >= 0)
+                {
+                    A->Sosed = this->All_Cell[ney[j]];
+                    A->c1 = (x + this->All_Cell[ney[j]]->Center->x) / 2.0;   // Вектор центройда грани
+                    A->c2 = (y + this->All_Cell[ney[j]]->Center->y) / 2.0;
+                    A->c3 = (z + this->All_Cell[ney[j]]->Center->z) / 2.0;
+                }
+                else if (ney[j] == -1)
+                {
+                    A->Sosed = this->Wall1;
+                }
+                else if (ney[j] == -2)
+                {
+                    A->Sosed = this->Wall2;
+                }
+                else if (ney[j] == -3)
+                {
+                    A->Sosed = this->Wall3;
+                }
+                else if (ney[j] == -4)
+                {
+                    A->Sosed = this->Wall4;
+                }
+                else if (ney[j] == -5)
+                {
+                    A->Sosed = this->Wall5;
+                }
+                else if (ney[j] == -6)
+                {
+                    A->Sosed = this->Wall6;
+                }
+                else if (ney[j] == -7)
+                {
+                    A->Sosed = this->Wall7;
+                }
+                else
+                {
+                    cout << "ERROR  395  Setka  hfjkhgefyuevy34u54" << endl;
+                }
+                bnk2 = bnk2 + A->Sosed->number;
+                i->Grans.push_back(A);
+            }
+
+            i->Candidates.clear();
+            if (bnl != i->Grans.size() || bnl2 != bnk2)
+            {
+                bkl = false;
+            }
+
         }
     }
     //cout << "B2" << endl;
+    return bkl;
+}
+
+bool Setka::Reconstruct_medium4(bool wide)
+{
+    // wide = false - перестроиваем парные и их соседей.
+    // wide = true - перестриваем парные и их соседей до 2 уровня включительно
+
+    // Добавляем кандидатов для ячеек
+    // Добавляем соседей-соседей по алгоритму без повторений, но ВСЁ ТОЛЬКО для ячеек близких к разрыву
+
+    // Обнулим маячок
+    bool bbb;
+
+    //cout << "A1" << endl;
+
+    // Не уверен, что здесь нужно это очищать
+    /*for (auto& i : this->All_Cell)
+    {
+        i->Candidates.clear();
+    }*/
+
+    for (auto& i : this->All_Cell)
+    {
+        if (i->include_ == true)
+        {
+            for (auto& j : i->Grans)
+            {
+                if (j->Sosed->type == C_base && j->Sosed->include_ == true)
+                {
+                    i->Candidates.push_back(j->Sosed);
+                }
+            }
+        }
+    }
+
+    for (auto& i : this->All_Cell)
+    {
+        if (i->include_ == true)
+        {
+            for (auto& j : i->Grans)
+            {
+                j->Sosed->i_sosed = false;
+                for (auto& k : j->Sosed->Grans)
+                {
+                    k->Sosed->i_sosed = false;
+                }
+
+                if (j->Sosed->i_boundary_1 == true)
+                {
+                    i->i_boundary_2 = true;
+                }
+            }
+
+            for (auto& j : i->Grans)
+            {
+                j->Sosed->i_sosed = true;
+            }
+
+            for (auto& j : i->Grans)
+            {
+                if (j->Sosed->type == C_base)
+                {
+                    for (auto& k : j->Sosed->Grans)
+                    {
+                        if (k->Sosed->type == C_base && k->Sosed->i_sosed == false && k->Sosed->include_ == true)
+                        {
+                            k->Sosed->i_sosed = true;
+                            k->Sosed->Candidates.push_back(i);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    //cout << "A2" << endl;
+
+    // Вычисляем парные ячейки, при этом добавляем кандидатов в обычные от парных
+    //cout << "B1" << endl;
+    bool bkl = true;
+#pragma omp parallel for
+    for (auto& i : this->All_Cell)
+    {
+        if (i->include_ == true)
+        {
+            double x, y, z, r, dd, nx, ny, nz;
+            double A, B, C;
+            voronoicell_neighbor c;
+            vector<int> ney;
+            ney.reserve(30);
+            vector<double> Surf;
+            Surf.reserve(30);
+            vector<double> norm;
+            norm.reserve(3);
+            i->Center->get(x, y, z);
+            int bnl = i->Grans.size();
+            int bnl2 = 0;
+            for (auto& j : i->Grans)
+            {
+                bnl2 = bnl2 + j->Sosed->number;
+                delete j;
+            }
+
+            i->Grans.clear();
+
+
+
+            c.init(-50.0, 50.0, -50.0, 50.0, -50.0, 50.0);
+
+            for (auto& j : i->Candidates)
+            {
+
+                if (j->type == C_base)
+                {
+                    if (j->include_ == false)
+                    {
+                        cout << "no include sfinefrlerf" << endl;
+                    }
+
+                    A = j->Center->x - x;
+                    B = j->Center->y - y;
+                    C = j->Center->z - z;
+                    c.nplane(A, B, C, (A * A + B * B + C * C), j->number);
+                }
+            }
+
+
+            if (true)//(i->i_boundary_1 || i->i_boundary_2)
+            {
+                c.nplane(2.0 * (x_max - x), 0.0, 0.0, -1);
+                c.nplane(2.0 * (x_min - x), 0.0, 0.0, -2);
+                c.nplane(0.0, 2.0 * (y_max - y), 0.0, -3);
+                c.nplane(0.0, 2.0 * (y_min - y), 0.0, -4);
+                c.nplane(0.0, 0.0, 2.0 * (z_max - z), -5);
+                c.nplane(0.0, 0.0, 2.0 * (z_min - z), -6);
+
+                r = sqrt(kv(x) + kv(y) + kv(z));
+                dd = r - (this->sl_L - 0.01 * RR_);
+                nx = x / r;
+                ny = y / r;
+                nz = z / r;
+                c.nplane(-2.0 * dd * nx, -2.0 * dd * ny, -2.0 * dd * nz, -7);
+            }
+
+
+
+
+            c.neighbors(ney); // Получаем список номеров соседей по порядку
+            c.face_areas(Surf);   // Площади граней
+            c.normals(norm);
+
+            double VV;
+            VV = c.volume();  // Записали объём ячейки
+            i->set_Volume(VV);
+
+            double nn1, nn2, nn3;
+            // Вычисляем движение для пар
+            if (i->couple_ == true)
+            {
+                i->move1 = i->move2 = i->move3 = 0.0;
+                int kkk;
+                for (int j = 0; j < ney.size(); j++)
+                {
+                    if (ney[j] >= 0)
+                    {
+                        kkk = 1;
+                        if (this->All_Cell[ney[j]]->couple_ == true)
+                        {
+                            kkk = 3;
+                        }
+                        nn1 = (this->All_Cell[ney[j]]->Center->x - x) / 2.0;
+                        nn2 = (this->All_Cell[ney[j]]->Center->y - y) / 2.0;
+                        nn3 = (this->All_Cell[ney[j]]->Center->z - z) / 2.0;
+                        i->move1 += Surf[j] * kkk * (nn1) / 3.0;
+                        i->move2 += Surf[j] * kkk * (nn2) / 3.0;
+                        i->move3 += Surf[j] * kkk * (nn3) / 3.0;
+                    }
+                }
+
+                i->move1 = i->move1 / VV;
+                i->move2 = i->move2 / VV;
+                i->move3 = i->move3 / VV;
+            }
+
+            int bnk2 = 0;
+            for (int j = 0; j < ney.size(); j++)
+            {
+                auto A = new Gran();
+                A->S = Surf[j];              // Площадь грани
+                A->n1 = norm[j * 3];
+                A->n2 = norm[j * 3 + 1];
+                A->n3 = norm[j * 3 + 2];
+
+
+                if (ney[j] >= 0)
+                {
+                    A->Sosed = this->All_Cell[ney[j]];
+                    A->c1 = (x + this->All_Cell[ney[j]]->Center->x) / 2.0;   // Вектор центройда грани
+                    A->c2 = (y + this->All_Cell[ney[j]]->Center->y) / 2.0;
+                    A->c3 = (z + this->All_Cell[ney[j]]->Center->z) / 2.0;
+                }
+                else if (ney[j] == -1)
+                {
+                    A->Sosed = this->Wall1;
+                }
+                else if (ney[j] == -2)
+                {
+                    A->Sosed = this->Wall2;
+                }
+                else if (ney[j] == -3)
+                {
+                    A->Sosed = this->Wall3;
+                }
+                else if (ney[j] == -4)
+                {
+                    A->Sosed = this->Wall4;
+                }
+                else if (ney[j] == -5)
+                {
+                    A->Sosed = this->Wall5;
+                }
+                else if (ney[j] == -6)
+                {
+                    A->Sosed = this->Wall6;
+                }
+                else if (ney[j] == -7)
+                {
+                    A->Sosed = this->Wall7;
+                }
+                else
+                {
+                    cout << "ERROR  395  Setka  hfjkhgefyuevy34u54" << endl;
+                }
+                bnk2 = bnk2 + A->Sosed->number;
+                i->Grans.push_back(A);
+            }
+
+            i->Candidates.clear();
+            if (bnl != i->Grans.size() || bnl2 != bnk2)
+            {
+                bkl = false;
+            }
+
+        }
+    }
+    //cout << "B2" << endl;
+    return bkl;
 }
 
 void Setka::Reconstruct_couple(bool t1)
@@ -2231,7 +2886,7 @@ void Setka::Cut_Surface(void)
         c.nplane(0.0, 0.0, 2.0 * (z_min - z), -6);
 
         // Весь код далее для печати сетки в файл Текплота. Сложности в том, что нужно по порядку расположить все узлы и грани сетки (Текплот так работает)
-        c.nplane(0.0, 0.0, -2.0 * z + 0.00001 * RR_, -77);
+        //c.nplane(0.0, 0.0, -2.0 * z + 0.00001 * RR_, -77);
 
         int sosed_couple = i->Par->A2->number;
 
@@ -2353,7 +3008,7 @@ void Setka::move_par(void)
         m1 = m1 - sk * n1;
         m2 = m2 - sk * n2;
         m3 = m3 - sk * n3;
-        i->move(m1 * 0.01, m2 * 0.01, m3 * 0.01);   // Коэффициент нужен для замедления движения, иначе оно слишком большое
+        i->move(m1 * 0.0007, m2 * 0.0007, m3 * 0.0007);   // 0.001 с Коэффициент нужен для замедления движения, иначе оно слишком большое
     }
 
 }
@@ -2381,6 +3036,17 @@ void Setka::Calc_normal(void)
 
         // Сначала ищем всех соседей
         for (auto& j : ii->A1->Grans)
+        {
+            if (j->Sosed->couple_ == true)
+            {
+                if (j->Sosed->Par != ii)
+                {
+                    Nei.insert(make_pair(j->Sosed->Par->number, j->Sosed->Par));
+                }
+            }
+        }
+
+        for (auto& j : ii->A2->Grans)
         {
             if (j->Sosed->couple_ == true)
             {
@@ -2446,6 +3112,22 @@ void Setka::Calc_normal(void)
                     n2 = n2 / nn;
                     n3 = n3 / nn;
 
+                    /*if (i == 0 && j == 1 && k == 2)
+                    {
+                        if (v1 * n1 + v2 * n2 + v3 * n3 >= 0.0)
+                        {
+                            v1 = n1;
+                            v2 = n2;
+                            v3 = n3;
+                        }
+                        else
+                        {
+                            v1 = -n1;
+                            v2 = -n2;
+                            v3 = -n3;
+                        }
+                    }*/
+
                     if (v1 * n1 + v2 * n2 + v3 * n3 >= 0.0)
                     {
                         ii->n1 += n1;
@@ -2468,11 +3150,99 @@ void Setka::Calc_normal(void)
         ii->n2 = ii->n2 / nn;
         ii->n3 = ii->n3 / nn;
 
+        /*if (v1 * n1 + v2 * n2 + v3 * n3 < 0.5)
+        {
+            cout << v1 << " " << v2 << " " << v3 << endl;
+            cout << n1 << " " << n2 << " " << n3 << endl;
+            cout << S << endl;
+            for (unsigned short int i = 0; i < S; i++)
+            {
+                cout << NN[i].x << " " << NN[i].y << " " << NN[i].z << endl;
+            }
+            exit(-1);
+        }*/
+
         //cout << "posle = " << ii->n1 << " " << ii->n2 << " " << ii->n3 << endl;
 
         //cout << ii->n1 << " - " << ii->n2 << " - " << ii->n3 << endl;
         //cout << v1 << " = " << v2 << " = " << v3 << " " << endl;
 
+    }
+
+    for (auto& ii : this->All_Couple)
+    {
+        ii->orient();
+    }
+}
+
+void Setka::Calc_normal2(void)
+{
+
+//#pragma omp parallel for
+    for (auto& ii : this->All_Couple)
+    {
+        ii->n1 = 0.0;
+        ii->n2 = 0.0;
+        ii->n3 = 0.0;
+        map <int, Couple*> Nei;
+        vector <Point> NN;
+        NN.reserve(9);
+        double x, y, z;
+        double a, b, c, d, e, f;
+        double n1, n2, n3, nn;
+
+        // Сначала ищем всех соседей
+        for (auto& j : ii->A1->Grans)
+        {
+            if (j->Sosed->couple_ == true)
+            {
+                if (j->Sosed->Par != ii)
+                {
+                    Nei.insert(make_pair(j->Sosed->Par->number, j->Sosed->Par));
+                }
+            }
+        }
+
+        for (auto& j : ii->A2->Grans)
+        {
+            if (j->Sosed->couple_ == true)
+            {
+                if (j->Sosed->Par != ii)
+                {
+                    Nei.insert(make_pair(j->Sosed->Par->number, j->Sosed->Par));
+                }
+            }
+        }
+
+
+        int S = Nei.size();
+
+        if (S < 1)
+        {
+            cout << "Net par!!!  703  sihfbkgvsdueqx13e3r2eda" << endl;
+            exit(-3);
+        }
+
+
+        for (auto& kk : Nei)
+        {
+            kk.second->get_normal(x, y, z);
+            NN.push_back(Point(x, y, z));
+        }
+
+
+        // Пробегаемся по всем парам - соседям
+        for (auto& kk : NN)
+        {
+            ii->n1 = ii->n1 + kk.x;
+            ii->n2 = ii->n2 + kk.y;
+            ii->n3 = ii->n3 + kk.z;
+        }
+
+        nn = sqrt(kv(ii->n1) + kv(ii->n2) + kv(ii->n3));
+        ii->n1 = ii->n1 / nn;
+        ii->n2 = ii->n2 / nn;
+        ii->n3 = ii->n3 / nn;
     }
 
     for (auto& ii : this->All_Couple)
@@ -2808,6 +3578,11 @@ void Setka::Cut_Plane_z_Tecplot(double R)
 			continue;
 		}
 
+        if (i->include_ == false)
+        {
+            continue;
+        }
+
         X = Y = Z = 0.0;
 
 		x = i->Center->x;
@@ -2920,6 +3695,11 @@ void Setka::Cut_Plane_y_Tecplot(double R)
     for (auto& i : this->All_Cell)
     {
         if (fabs(i->Center->y) > R)
+        {
+            continue;
+        }
+
+        if (i->include_ == false)
         {
             continue;
         }
@@ -3072,6 +3852,133 @@ void Setka::Initialization_do_MHD(void)
             }
         }
     }
+
+    for (auto& i : this->All_Couple)
+    {
+        i->Resolve();
+        double n1, n2, n3;
+        i->get_normal(n1, n2, n3);
+        i->n1 = n1;
+        i->n2 = n2;
+        i->n3 = n3;
+    }
+
+    for (auto& i : this->All_Cell)
+    {
+        if (i->include_ == false)
+        {
+            i->mgd_ = false;
+            continue;
+        }
+        else
+        {
+            i->mgd_ = true;
+        }
+
+        bool inner = false;
+        bool intry = false;
+        for (auto& j : i->Grans)
+        {
+            if (j->Sosed->type == C_sphere)
+            {
+                inner = true;
+            }
+
+            if (j->Sosed->type == C_wall_x_max)
+            {
+                intry = true;
+            }
+        }
+
+        if (intry == true || inner == true)
+        {
+            i->mgd_ = false;
+        }
+    }
+
+    for (auto& i : this->All_Cell)
+    {
+        if (i->include_ == true && i->mgd_ == true)
+        {
+            if (i->par[0].ro == 0.0)
+            {
+                cout << i->couple_ << " " << i->type << " " << i->Center->x << " " << i->Center->y << " " << i->Center->z << endl;
+                cout << i->number << " " << i->Grans.size() << endl;
+                exit(-1);
+            }
+
+            if (i->par[1].ro == 0.0)
+            {
+                cout << "2 --- " << i->couple_ << " " << i->type << " " << i->Center->x << " " << i->Center->y << " " << i->Center->z << endl;
+                exit(-1);
+            }
+        }
+    }
+
+    for (auto& i : this->All_Cell)
+    {
+        if (i->i_init_mgd == true)
+        {
+            double ro = 0.0;
+            double p = 0.0;
+            double u = 0.0;
+            double v = 0.0;
+            double w = 0.0;
+            double bx = 0.0;
+            double by = 0.0;
+            double bz = 0.0;
+            int kk = 0;
+            for (auto& j : i->Grans)
+            {
+                if (j->Sosed->type == C_base && j->Sosed->include_ == true && j->Sosed->i_init_mgd == false)
+                {
+                    kk++;
+                    ro = ro + j->Sosed->par[0].ro;
+                    p = p + j->Sosed->par[0].p;
+                    u = u + j->Sosed->par[0].u;
+                    v = v + j->Sosed->par[0].v;
+                    w = w + j->Sosed->par[0].w;
+                    bx = bx + j->Sosed->par[0].bx;
+                    by = by + j->Sosed->par[0].by;
+                    bz = bz + j->Sosed->par[0].bz;
+                }
+            }
+
+            if (kk == 0)
+            {
+                cout << "ERROR  3844  init mgd" << endl;
+                i->par[0].ro = 1.0;
+                i->par[0].p = 1.0 / (ggg);
+                i->par[0].u = -M_inf; //-1.0;
+                i->par[0].v = 0.0;
+                i->par[0].w = 0.0;
+                i->par[0].bx = 0.0; // -betta * cos(0.5235);
+                i->par[0].by = 0.0; // -betta * cos(0.5235);
+                i->par[0].bz = 0.0;
+            }
+            else
+            {
+                i->par[0].ro = ro / kk;
+                i->par[0].p = p / kk;
+                i->par[0].u = u / kk;
+                i->par[0].v = v / kk;
+                i->par[0].w = w / kk;
+                i->par[0].bx = bx / kk;
+                i->par[0].by = by / kk;
+                i->par[0].bz = bz / kk;
+            }
+        }
+
+    }
+
+    for (auto& i : this->All_Cell)
+    {
+        i->i_init_mgd = false;
+    }
+
+    this->Calc_normal();
+    this->Calc_normal2();
+    this->Calc_normal();
 }
 
 void Setka::Go_MHD(int times)
@@ -3085,7 +3992,7 @@ void Setka::Go_MHD(int times)
 
     for (int st = 0; st <= times; st++)
     {
-        if (st % 1 == 0 && st > 0)
+        if (st % 100 == 0 && st > 0)
         {
             cout << "Go_MHD    " << st << " " << T[now2] << endl;
         }
@@ -3307,10 +4214,11 @@ void Setka::Start_MHD(int times)
     double T[2];
     T[0] = T[1] = 0.00000001;
     mutex mut;
+    bool bkl = true;
 
     for (int st = 0; st < times; st++)
     {
-        if (st % 1 == 0)
+        if (st % 5 == 0)
         {
             cout << "Start_MHD    " << st << " " << T[now2] << endl;
         }
@@ -3319,29 +4227,25 @@ void Setka::Start_MHD(int times)
         T[now2] = 100000000;
 
        
+        
         this->Culc_couple(now1, T[now1]);    // Считаем движение пар из задачи о распаде разрыва и двигаем их!!!
-        if (st % 5 == 0)
-        {
-            this->Calc_normal();
-        }
-
+        this->Reconstruct_medium3(true);
         this->move_par();
+        this->Calc_normal();
+        bkl = true;
+        do
+        {
+            bkl = this->Reconstruct_medium3(true);
+            //cout << "bkl = " << bkl << endl;
+            if (st % 5 == 0)
+            {
+                cout << "bkl = " << bkl << endl;
+            }
+        } while (bkl == false);
 
-        if (false)//(st % 100000 == 0)
-        {
-            this->Reconstruct_couple(false);          // Перестроили сетку (из-за того, что пары подвинули)
-            this->Reconstruct_couple(false);
-            this->Reconstruct_couple(false);
-        }
-        else if (false) //(st % 10000 == 0)
-        {
-            this->Reconstruct_couple(false);
-            this->Reconstruct_couple(false);
-        }
-        else
-        {
-            this->Reconstruct_medium3(true);
-        }
+        //this->Reconstruct_medium3(true);
+        //this->Reconstruct_medium3(true);
+
         // Важно! Это перестроение должно обязатьльно быть, так как во время него создаются новые грани (физически новые переменные)
         // а старые грани в конце функции очистятся (указатели сотрутся)
         // а если мы не обновим грани, то они просто удаляется
@@ -3356,6 +4260,7 @@ void Setka::Start_MHD(int times)
             K->near_par_2 = false;
             K->i_boundary_1 = false;
             K->i_boundary_2 = false;
+            K->i_include_candidate = false;
             if (K->include_ == false)
             {
                 K->par[now2] = K->par[now1];
@@ -3462,6 +4367,10 @@ void Setka::Start_MHD(int times)
                 sks = n1 * (bx + bx2) / 2.0 + n2 * (by + by2) / 2.0 + n3 * (bz + bz2) / 2.0;
                 Potok[8] = Potok[8] + sks * S;
 
+                if (K->couple_ == false && i->Sosed->couple_ == true && dist < 0.05)
+                {
+                    K->i_include_candidate = true;                    // Кандидат на отлючение
+                }
                 // Вычисляем скорость движения грани
                 double wv = 0.0;
                 if (i->Sosed->type == C_base)
@@ -3578,6 +4487,240 @@ void Setka::Start_MHD(int times)
     }
 }
 
+void Setka::Rebuild(void)
+{
+    this->Initialization_do_MHD();
+    for (auto& ii : this->All_Couple)
+    {
+        if (ii->A1->include_ == false)
+        {
+            continue;
+        }
+        ii->d_sosed = 0.0;
+        double x, y, z;
+        double a, b, c, d, e, f;
+        double n1, n2, n3, nn;
+
+        ii->get_centr(x, y, z);
+        double x2, y2, z2;
+
+        // Сначала ищем всех соседей
+        for (auto& j : ii->A1->Grans)
+        {
+            if (j->Sosed->couple_ == true)
+            {
+                if (j->Sosed->Par != ii)
+                {
+                    j->Sosed->Par->get_centr(x2, y2, z2);
+                    ii->d_sosed = max(ii->d_sosed, sqrt(kv(x - x2) + kv(y - y2) + kv(z - z2)));
+                }
+            }
+        }
+
+        for (auto& j : ii->A2->Grans)
+        {
+            if (j->Sosed->couple_ == true)
+            {
+                if (j->Sosed->Par != ii)
+                {
+                    j->Sosed->Par->get_centr(x2, y2, z2);
+                    ii->d_sosed = max(ii->d_sosed, sqrt(kv(x - x2) + kv(y - y2) + kv(z - z2)));
+                }
+            }
+        }
+    }
+
+    bool bkl = true;
+    this->include_cells();
+    this->Construct_start();
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+    this->Reconstruct_medium2(true);
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+    this->Reconstruct_medium2(true);
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+    //this->Initialization_do_MHD();
+
+    this->exclude_cells();
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+    this->Reconstruct_medium2(true);
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+    this->Reconstruct_medium2(true);
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+    this->Initialization_do_MHD();
+}
+
+void Setka::Zapusk(void)
+{
+    this->Initialization_do_MHD();
+    cout << " bbb  =  " << this->Reconstruct_medium3(true) << endl;
+    bool bkl = true;
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+
+    this->Rebuild();
+
+    this->Initialization_do_MHD();
+    this->Init();
+    this->Go_MHD(5000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+
+    this->Rebuild();
+
+    this->Initialization_do_MHD();
+    this->Init();
+    cout << "SECTION 2" << endl;
+    this->Go_MHD(5000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+
+    this->Rebuild();
+
+    this->Initialization_do_MHD();
+    this->Init();
+    cout << "SECTION 3" << endl;
+    this->Go_MHD(5000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+
+    this->Save_setka("vers_8");
+
+    this->Rebuild();
+
+    this->Initialization_do_MHD();
+    this->Init();
+    cout << "SECTION 4" << endl;
+    this->Go_MHD(5000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+
+    this->Rebuild();
+
+    this->Initialization_do_MHD();
+    this->Init();
+    cout << "SECTION 5" << endl;
+    this->Go_MHD(5000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+
+    this->Save_setka("vers_9");
+
+    this->Rebuild();
+
+    this->Initialization_do_MHD();
+    this->Init();
+    cout << "SECTION 6" << endl;
+    this->Go_MHD(5000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+
+    this->Rebuild();
+
+    this->Initialization_do_MHD();
+    this->Init();
+    cout << "SECTION 7" << endl;
+    this->Go_MHD(5000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    this->Go_MHD(1000);
+    this->Start_MHD(100);
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+
+    this->Save_setka("vers_10");
+
+    this->Rebuild();
+
+    this->Initialization_do_MHD();
+    this->Init();
+    cout << "SECTION 8" << endl;
+    this->Go_MHD(5000);
+    this->Start_MHD(300);
+
+    //this->Rebuild();
+
+    this->Initialization_do_MHD();
+}
+
 void Setka::Save_MHD(string name_f)
 {
     ofstream fout;
@@ -3602,6 +4745,8 @@ void Setka::Download_MHD(string name_f)
     {
         fout >> X >> Y >> Z >> i->par[0].ro >> i->par[0].p >> i->par[0].u >> i->par[0].v >> //
             i->par[0].w >> i->par[0].bx >> i->par[0].by >> i->par[0].bz;
+
+        i->par[1] = i->par[0];
     }
 }
 
@@ -3611,7 +4756,7 @@ void Setka::Init(void)
     double x, y, z, r;
     for (auto& i : this->All_Cell)
     {
-        bool inner = false;
+        /*bool inner = false;
         bool intry = false;
         for (auto& j : i->Grans)
         {
@@ -3629,6 +4774,11 @@ void Setka::Init(void)
         if (intry == true || inner == true)
         {
             i->mgd_ = false;
+        }*/
+
+        if (i->mgd_ == true)
+        {
+            continue;
         }
 
         i->Center->get(x, y, z);
@@ -4928,6 +6078,8 @@ double Setka::HLLDQ_Korolkov(const double& ro_L, const double& Q_L, const double
             ro_LL = ro_L;
             PTTL = pTL;
             cout << "2252   jfhfghjieuye  LLL" << endl;
+            cout << ro_L << " " << p_L << " " << ro_R << " " << p_R << " " << v1_L << " " << v1_R << " " << Bx_L << " " << Bx_R << endl;
+            exit(-1);
         }
 
         if (fabs(ttR) >= 0.00001)
