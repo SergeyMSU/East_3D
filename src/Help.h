@@ -55,6 +55,8 @@
 #define M_inf 0.05
 #define betta 4.2426
 
+#define normB false           // Ќужно ли вычитать нормальную компоненту магнитного пол€ на контакте?
+
 
 template <typename T> int sgn(T val) {
     return (T(0) < val) - (val < T(0));

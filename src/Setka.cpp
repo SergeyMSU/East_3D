@@ -23,6 +23,7 @@ Setka::Setka(string name)
     this->renumber();
 
     this->Initialization_do_MHD();
+    this->Initialization_do_MHD();
     //this->Calc_normal();
     this->Reconstruct_medium2();
     cout << "End  read  " << name << endl;
@@ -425,8 +426,8 @@ void Setka::Construct_start(void)
 void Setka::Add_couple_start(void)
 {
     cout << "Add_couple_start" << endl;
-    int Ni = 150;    // По z - оси
-    int Nj = 200;
+    int Ni = 260;    // По z - оси
+    int Nj = 180;
     double dd = 0.05;
     double r = 2.61;
     double phi = 0.0;
@@ -443,7 +444,29 @@ void Setka::Add_couple_start(void)
             y = r * sin(phi);
             x2 = (r + dd) * cos(phi);
             y2 = (r + dd) * sin(phi);
-            z = -5.0 + i * 10.0 / (Ni - 1);
+            z = -9.8 + i * 19.6 / (Ni - 1);
+
+            if (fabs(z) > 6)
+            {
+                if (i % 7 != 0)
+                {
+                    continue;
+                }
+            }
+            else if (fabs(z) > 5)
+            {
+                if (i % 3 != 0)
+                {
+                    continue;
+                }
+            }
+            else if (fabs(z) > 4)
+            {
+                if (i % 2 != 0)
+                {
+                    continue;
+                }
+            }
 
             auto A = new Cell(x, y, z);
             A->type = C_base;
@@ -2049,7 +2072,7 @@ bool Setka::Reconstruct_medium3(bool wide)
                         kkk = 1;
                         if (this->All_Cell[ney[j]]->couple_ == true)
                         {
-                            kkk = 1;   // 3
+                            kkk = 3;   // 3
                         }
                         nn1 = (this->All_Cell[ney[j]]->Center->x - x) / 2.0;
                         nn2 = (this->All_Cell[ney[j]]->Center->y - y) / 2.0;
@@ -2139,7 +2162,7 @@ bool Setka::Reconstruct_medium4(bool wide)
 
     // Добавляем кандидатов для ячеек
     // Добавляем соседей-соседей по алгоритму без повторений, но ВСЁ ТОЛЬКО для ячеек близких к разрыву
-
+    //cout << "Reconstruct_medium4" << endl;
     // Обнулим маячок
     bool bbb;
 
@@ -2150,16 +2173,20 @@ bool Setka::Reconstruct_medium4(bool wide)
     {
         i->Candidates.clear();
     }*/
-
+    //cout << "A1" << endl;
     for (auto& i : this->All_Cell)
     {
+        i->Candidates.clear();
         if (i->include_ == true)
         {
             for (auto& j : i->Grans)
             {
                 if (j->Sosed->type == C_base && j->Sosed->include_ == true)
                 {
-                    i->Candidates.push_back(j->Sosed);
+                    if (i->number != j->Sosed->number)
+                    {
+                        i->Candidates.push_back(j->Sosed);
+                    }
                 }
             }
         }
@@ -2197,7 +2224,10 @@ bool Setka::Reconstruct_medium4(bool wide)
                         if (k->Sosed->type == C_base && k->Sosed->i_sosed == false && k->Sosed->include_ == true)
                         {
                             k->Sosed->i_sosed = true;
-                            k->Sosed->Candidates.push_back(i);
+                            if (k->Sosed->number != i->number)
+                            {
+                                k->Sosed->Candidates.push_back(i);
+                            }
                         }
                     }
                 }
@@ -2238,6 +2268,7 @@ bool Setka::Reconstruct_medium4(bool wide)
 
             c.init(-50.0, 50.0, -50.0, 50.0, -50.0, 50.0);
 
+            //cout << "B1" << endl;
             for (auto& j : i->Candidates)
             {
 
@@ -2251,10 +2282,18 @@ bool Setka::Reconstruct_medium4(bool wide)
                     A = j->Center->x - x;
                     B = j->Center->y - y;
                     C = j->Center->z - z;
+                    /*if (sqrt(A * A + B * B + C * C) <= 0.0000001)
+                    {
+                        cout << "00000  eroor  jiuhrfubfr" << endl;
+                        cout << i->number << " " << j->number << endl;
+                        cout << x << " " << y << " " << z << endl;
+                        cout << j->Center->x << " " << j->Center->y << " " << j->Center->z << endl;
+                        exit(-3);
+                    }*/
                     c.nplane(A, B, C, (A * A + B * B + C * C), j->number);
                 }
             }
-
+            //cout << "B2" << endl;
 
             if (true)//(i->i_boundary_1 || i->i_boundary_2)
             {
@@ -2274,7 +2313,7 @@ bool Setka::Reconstruct_medium4(bool wide)
             }
 
 
-
+            //cout << "B3" << endl;
 
             c.neighbors(ney); // Получаем список номеров соседей по порядку
             c.face_areas(Surf);   // Площади граней
@@ -2283,34 +2322,102 @@ bool Setka::Reconstruct_medium4(bool wide)
             double VV;
             VV = c.volume();  // Записали объём ячейки
             i->set_Volume(VV);
-
+            //cout << "B4" << endl;
             double nn1, nn2, nn3;
             // Вычисляем движение для пар
-            if (i->couple_ == true)
+            if (i->couple_ == true && wide == true)
             {
                 i->move1 = i->move2 = i->move3 = 0.0;
-                int kkk;
+                double kkk = 1.0;
+                double nor = 1.0;
                 for (int j = 0; j < ney.size(); j++)
                 {
+                    kkk = 1.0;
                     if (ney[j] >= 0)
                     {
-                        kkk = 1;
-                        if (this->All_Cell[ney[j]]->couple_ == true)
+                        double zz = fabs(z);
+                        if (fabs(this->All_Cell[ney[j]]->Center->z) < zz && zz > 0.6)
                         {
-                            kkk = 3;
+                            /*if (zz < 3.834)
+                            {
+                                kkk = zz * zz * zz * 1.5 * exp(-zz * zz / 4.0) + 1.0;
+                            }
+                            else
+                            {
+                                kkk = 3.834 * 3.834 * 3.834 * 1.5 * exp(-3.834 * 3.834 / 4.0) + 1.0;
+                            }*/
+
+                            kkk = 1.3;
                         }
+                        else if (fabs(this->All_Cell[ney[j]]->Center->z) < zz && zz > 0.4)
+                        {
+                            kkk = 1.2;
+                        }
+
+                        if (this->All_Cell[ney[j]]->couple_ != true)
+                        {
+                            kkk = 0.0; // 3
+                            continue;
+                        }
+                        nor = max(nor,kkk);
                         nn1 = (this->All_Cell[ney[j]]->Center->x - x) / 2.0;
                         nn2 = (this->All_Cell[ney[j]]->Center->y - y) / 2.0;
                         nn3 = (this->All_Cell[ney[j]]->Center->z - z) / 2.0;
+                        
+                        i->move1 += Surf[j] * kkk * (nn1) / 3.0;
+                        i->move2 += Surf[j] * kkk * (nn2) / 3.0;
+                        i->move3 += Surf[j] * kkk * (nn3) / 3.0;
+                    }
+                    else
+                    {
+                        nn1 = nn2 = nn3 = 0.0;
+                        kkk = 1.1;
+                        if (ney[j] == -1)
+                        {
+                            nn1 = x_max - x;
+                            nn2 = 0.0;
+                            nn3 = 0.0;
+                        }
+                        else if (ney[j] == -2)
+                        {
+                            nn1 = x_min - x;
+                            nn2 = 0.0;
+                            nn3 = 0.0;
+                        }
+                        else if (ney[j] == -3)
+                        {
+                            nn1 = 0.0;
+                            nn2 = y_max - y;
+                            nn3 = 0.0;
+                        }
+                        else if (ney[j] == -4)
+                        {
+                            nn1 = 0.0;
+                            nn2 = y_min - y;
+                            nn3 = 0.0;
+                        }
+                        else if (ney[j] == -5)
+                        {
+                            nn1 = 0.0;
+                            nn2 = 0.0;
+                            nn3 = z_max - z;
+                        }
+                        else if (ney[j] == -6)
+                        {
+                            nn1 = 0.0;
+                            nn2 = 0.0;
+                            nn3 = z_min - z;
+                        }
+                        nor = max(nor, kkk);
                         i->move1 += Surf[j] * kkk * (nn1) / 3.0;
                         i->move2 += Surf[j] * kkk * (nn2) / 3.0;
                         i->move3 += Surf[j] * kkk * (nn3) / 3.0;
                     }
                 }
 
-                i->move1 = i->move1 / VV;
-                i->move2 = i->move2 / VV;
-                i->move3 = i->move3 / VV;
+                i->move1 = i->move1 / (VV * nor);
+                i->move2 = i->move2 / (VV * nor);
+                i->move3 = i->move3 / (VV * nor);
             }
 
             int bnk2 = 0;
@@ -2326,9 +2433,12 @@ bool Setka::Reconstruct_medium4(bool wide)
                 if (ney[j] >= 0)
                 {
                     A->Sosed = this->All_Cell[ney[j]];
-                    A->c1 = (x + this->All_Cell[ney[j]]->Center->x) / 2.0;   // Вектор центройда грани
-                    A->c2 = (y + this->All_Cell[ney[j]]->Center->y) / 2.0;
-                    A->c3 = (z + this->All_Cell[ney[j]]->Center->z) / 2.0;
+                    if (wide == true)
+                    {
+                        A->c1 = (x + this->All_Cell[ney[j]]->Center->x) / 2.0;   // Вектор центройда грани
+                        A->c2 = (y + this->All_Cell[ney[j]]->Center->y) / 2.0;
+                        A->c3 = (z + this->All_Cell[ney[j]]->Center->z) / 2.0;
+                    }
                 }
                 else if (ney[j] == -1)
                 {
@@ -2365,7 +2475,7 @@ bool Setka::Reconstruct_medium4(bool wide)
                 bnk2 = bnk2 + A->Sosed->number;
                 i->Grans.push_back(A);
             }
-
+            //cout << "B5" << endl;
             i->Candidates.clear();
             if (bnl != i->Grans.size() || bnl2 != bnk2)
             {
@@ -3008,7 +3118,7 @@ void Setka::move_par(void)
         m1 = m1 - sk * n1;
         m2 = m2 - sk * n2;
         m3 = m3 - sk * n3;
-        i->move(m1 * 0.0007, m2 * 0.0007, m3 * 0.0007);   // 0.001 с Коэффициент нужен для замедления движения, иначе оно слишком большое
+        i->move(m1 * 0.0003, m2 * 0.0003, m3 * 0.0003);   // 0.0007 с Коэффициент нужен для замедления движения, иначе оно слишком большое
     }
 
 }
@@ -3019,7 +3129,16 @@ void Setka::Calc_normal(void)
 #pragma omp parallel for
     for (auto& ii : this->All_Couple)
     {
+        if (ii->A1->include_ == false)
+        {
+            continue;
+        }
         double v1, v2, v3;
+        double dv1, dv2, dv3;
+        int kl = 3;
+        dv1 = 3.0 * ii->dvig1;
+        dv2 = 3.0 * ii->dvig2;
+        dv3 = 3.0 * ii->dvig3;
         v1 = ii->n1;
         v2 = ii->n2;
         v3 = ii->n3;
@@ -3033,6 +3152,7 @@ void Setka::Calc_normal(void)
         double x, y, z;
         double a, b, c, d, e, f;
         double n1, n2, n3, nn;
+        double d1, d2;
 
         // Сначала ищем всех соседей
         for (auto& j : ii->A1->Grans)
@@ -3062,7 +3182,7 @@ void Setka::Calc_normal(void)
 
         if (S < 1)
         {
-            cout << "Net par!!!  703  sihfbkgvsdueqx13e3r2eda" << endl;
+            cout << "Net par!!!  703  sihfbkgvsdueqx13e3r2eda     =  " << ii->A1->Grans.size() << "   " << ii->A2->Grans.size() << endl;
             exit(-3);
         }
 
@@ -3091,6 +3211,7 @@ void Setka::Calc_normal(void)
             NN.push_back(Point(x, y, z));
         }
 
+        bool bnv = false;
         // Пробегаемся по всем парам - соседям
         for (unsigned short int i = 0; i < S - 2; i++)
         {
@@ -3104,6 +3225,22 @@ void Setka::Calc_normal(void)
                     d = NN[k].y - NN[i].y;
                     e = NN[j].z - NN[i].z;
                     f = NN[k].z - NN[i].z;
+
+                    d1 = sqrt(kv(a) + kv(c) + kv(e));
+                    d2 = sqrt(kv(b) + kv(d) + kv(f));
+
+                    if (fabs(a * b + c * d + e * f) / (d1 * d2) > 0.8)
+                    {
+                        if (bnv == false)
+                        {
+                            ii->n1 += v1;
+                            ii->n2 += v2;
+                            ii->n3 += v3;
+                        }
+                        continue;
+                    }
+
+                    bnv = true;
                     n1 = c * f - e * d;
                     n2 = -a * f + e * b;
                     n3 = a * d - b * c;
@@ -3112,6 +3249,14 @@ void Setka::Calc_normal(void)
                     n2 = n2 / nn;
                     n3 = n3 / nn;
 
+                    
+
+                    /*if (n3 > 0.1)
+                    {
+                        cout << "ERROR  " << NN[i].x << " " << NN[i].y << " " << NN[i].z << endl;
+                        cout << NN[j].x << " " << NN[j].y << " " << NN[j].z << endl;
+                        cout << NN[k].x << " " << NN[k].y << " " << NN[k].z << endl;
+                    }*/
                     /*if (i == 0 && j == 1 && k == 2)
                     {
                         if (v1 * n1 + v2 * n2 + v3 * n3 >= 0.0)
@@ -3145,42 +3290,54 @@ void Setka::Calc_normal(void)
             }
         }
 
+        for (auto& kk : Nei)
+        {
+            dv1 += kk.second->dvig1;
+            dv2 += kk.second->dvig2;
+            dv3 += kk.second->dvig3;
+            kl++;
+        }
+
+        kl++;
+
+        dv1 = dv1 / kl;
+        dv2 = dv2 / kl;
+        dv3 = dv3 / kl;
+        //ii->A1->Center->move(dv1, dv2, dv3);  // Сразу передвинули пару
+        //ii->A2->Center->move(dv1, dv2, dv3);
+        ii->mo1 = dv1;
+        ii->mo2 = dv2;
+        ii->mo3 = dv3;
+
         nn = sqrt(kv(ii->n1) + kv(ii->n2) + kv(ii->n3));
         ii->n1 = ii->n1 / nn;
         ii->n2 = ii->n2 / nn;
         ii->n3 = ii->n3 / nn;
 
-        /*if (v1 * n1 + v2 * n2 + v3 * n3 < 0.5)
-        {
-            cout << v1 << " " << v2 << " " << v3 << endl;
-            cout << n1 << " " << n2 << " " << n3 << endl;
-            cout << S << endl;
-            for (unsigned short int i = 0; i < S; i++)
-            {
-                cout << NN[i].x << " " << NN[i].y << " " << NN[i].z << endl;
-            }
-            exit(-1);
-        }*/
-
-        //cout << "posle = " << ii->n1 << " " << ii->n2 << " " << ii->n3 << endl;
-
-        //cout << ii->n1 << " - " << ii->n2 << " - " << ii->n3 << endl;
-        //cout << v1 << " = " << v2 << " = " << v3 << " " << endl;
-
     }
 
     for (auto& ii : this->All_Couple)
     {
+        if (ii->A1->include_ == false)
+        {
+            continue;
+        }
         ii->orient();
+        ii->A1->Center->move(ii->mo1, ii->mo2, ii->mo3);  // Сразу передвинули пару
+        ii->A2->Center->move(ii->mo1, ii->mo2, ii->mo3);
     }
 }
 
 void Setka::Calc_normal2(void)
 {
 
-//#pragma omp parallel for
+#pragma omp parallel for
     for (auto& ii : this->All_Couple)
     {
+        if (ii->A1->include_ == false)
+        {
+            continue;
+        }
         ii->n1 = 0.0;
         ii->n2 = 0.0;
         ii->n3 = 0.0;
@@ -3219,7 +3376,7 @@ void Setka::Calc_normal2(void)
 
         if (S < 1)
         {
-            cout << "Net par!!!  703  sihfbkgvsdueqx13e3r2eda" << endl;
+            cout << "Net par!!!  dsffsfsfsfsefsefsfesefsefsefsef  sihfbkgvsdueqx13e3r2eda" << endl;
             exit(-3);
         }
 
@@ -3247,7 +3404,95 @@ void Setka::Calc_normal2(void)
 
     for (auto& ii : this->All_Couple)
     {
+        if (ii->A1->include_ == false)
+        {
+            continue;
+        }
         ii->orient();
+    }
+}
+
+void Setka::Smooth(void)
+{
+    for (auto& ii : this->All_Couple)
+    {
+        ii->dvig1 = 0.0;
+        ii->dvig2 = 0.0;
+        ii->dvig3 = 0.0;
+        map <int, Couple*> Nei;
+        vector <Point> NN;
+        NN.reserve(9);
+        double x, y, z;
+
+        ii->get_centr(x, y, z);
+
+        if (fabs(z) < 2.0)
+        {
+            continue;
+        }
+
+        // Сначала ищем всех соседей
+        for (auto& j : ii->A1->Grans)
+        {
+            if (j->Sosed->couple_ == true)
+            {
+                if (j->Sosed->Par != ii)
+                {
+                    Nei.insert(make_pair(j->Sosed->Par->number, j->Sosed->Par));
+                }
+            }
+        }
+
+        for (auto& j : ii->A2->Grans)
+        {
+            if (j->Sosed->couple_ == true)
+            {
+                if (j->Sosed->Par != ii)
+                {
+                    Nei.insert(make_pair(j->Sosed->Par->number, j->Sosed->Par));
+                }
+            }
+        }
+
+
+        for (auto& kk : Nei)
+        {
+            kk.second->get_centr(x, y, z);
+            NN.push_back(Point(x, y, z));
+        }
+
+        ii->get_centr(x, y, z);
+        NN.push_back(Point(x, y, z));
+
+        double cc1 = 0.0, cc2 = 0.0, cc3 = 0.0;
+
+        for (auto& i : NN)
+        {
+            cc1 = cc1 + i.x;
+            cc2 = cc2 + i.y;
+            cc3 = cc3 + i.z;
+        }
+
+        cc1 = cc1 / NN.size();
+        cc2 = cc2 / NN.size();
+        cc3 = cc3 / NN.size();
+
+        ii->dvig1 = cc1 - x;
+        ii->dvig2 = cc2 - y;
+        ii->dvig3 = cc3 - z;
+    }
+
+    for (auto& ii : this->All_Couple)
+    {
+        ii->A1->Center->move(ii->dvig1, ii->dvig2, ii->dvig3);  // Сразу передвинули пару
+        ii->A2->Center->move(ii->dvig1, ii->dvig2, ii->dvig3);
+    }
+
+    for (auto& ii : this->All_Couple)
+    {
+        ii->dvig1 = 0.0;
+        ii->dvig2 = 0.0;
+        ii->dvig3 = 0.0;
     }
 }
 
@@ -3527,13 +3772,16 @@ void Setka::Cut_Plane_y(double R)
         E += f_vert[m];
     }
 
-    fout << "TITLE = \"HP\"  VARIABLES = \"X\", \"Y\", \"Z\"  ZONE T= \"HP\", N=" << N << ", E=" << E << ", F=FEPOINT, ET=LINESEG " << endl;
+    fout << "TITLE = \"HP\"  VARIABLES = \"X\", \"Z\"  ZONE T= \"HP\", N=" << N << ", E=" << E << ", F=FEPOINT, ET=LINESEG " << endl;
 
     int jkl = 0;
     for (int j = 0; j < Versh.size(); j++)
     {
         jkl++;
-        fout << Versh[j] << " ";
+        if ((jkl + 1) % 3 != 0)
+        {
+            fout << Versh[j] << " ";
+        }
         if (jkl % 3 == 0)
         {
             fout << endl;
@@ -3688,7 +3936,7 @@ void Setka::Cut_Plane_y_Tecplot(double R)
     ofstream fout;
     string name_f = "2D_tecplot_y_plane.txt";
     fout.open(name_f);
-    fout << "TITLE = \"HP\"  VARIABLES = \"X\", \"Z\", \"r\", \"Rho\", \"P\", \"Vx\", \"Vy\", \"Vz\"," << //
+    fout << "TITLE = \"HP\"  VARIABLES = \"X\", \"Z\", \"r\", \"Rho\", \"P\", \"Vx\", \"Vy\", \"Vz\", \"BB\", \"divB\", " << //
         "\"Bx\", \"By\", \"Bz\", ZONE T = \"HP\"" << endl;
 
 
@@ -3787,10 +4035,11 @@ void Setka::Cut_Plane_y_Tecplot(double R)
         Y = Y / kkk;
         Z = Z / kkk;
 
+        double BB = sqrt(kv(i->par[0].bx) + kv(i->par[0].by) + kv(i->par[0].bz));
+
         fout << X << " " << Z << " " << sqrt(kv(X) + kv(Y)) << " " << i->par[0].ro << " " <<//
             i->par[0].p << " " << i->par[0].u << " " << i->par[0].v << " " << i->par[0].w << " " << //
-            i->par[0].bx << " " << i->par[0].by << " " << i->par[0].bz << " " << endl;
-
+            BB << " " << i->par[0].divB << " " << i->par[0].bx << " " << i->par[0].by << " " << i->par[0].bz << " " << endl;
     }
 
 }
@@ -3801,6 +4050,16 @@ void Setka::Initialization_do_MHD(void)
 
     for (auto& i : this->All_Cell)
     {
+        if (i->include_ == false)
+        {
+            continue;
+        }
+
+        if (i->i_delete == true)
+        {
+            cout << "ERROR  3809" << endl;
+        }
+
         i->Candidates.clear();
         double V = 0.0;
         i->get_Volume(V);
@@ -3823,7 +4082,7 @@ void Setka::Initialization_do_MHD(void)
             }
         }
     }
-
+    //cout << "I1" << endl;
     for (auto& ii : this->All_Cell)
     {
         if (ii->include_ == true)
@@ -3841,9 +4100,14 @@ void Setka::Initialization_do_MHD(void)
             }
         }
     }
-
+    //cout << "I2" << endl;
     for (auto& i : this->All_Cell)
     {
+        if (i->include_ == false)
+        {
+            continue;
+        }
+
         for (auto& j : i->Grans)
         {
             if (j->Sosed->type != C_base)
@@ -3852,9 +4116,15 @@ void Setka::Initialization_do_MHD(void)
             }
         }
     }
-
+    //cout << "I3" << endl;
     for (auto& i : this->All_Couple)
     {
+        if (i->A1->include_ == false)
+        {
+            continue;
+        }
+        i->A1->n_cop = 1;
+        i->A2->n_cop = 2;
         i->Resolve();
         double n1, n2, n3;
         i->get_normal(n1, n2, n3);
@@ -3862,7 +4132,7 @@ void Setka::Initialization_do_MHD(void)
         i->n2 = n2;
         i->n3 = n3;
     }
-
+    //cout << "I4" << endl;
     for (auto& i : this->All_Cell)
     {
         if (i->include_ == false)
@@ -3896,27 +4166,13 @@ void Setka::Initialization_do_MHD(void)
         }
     }
 
+    //cout << "I5" << endl;
     for (auto& i : this->All_Cell)
     {
-        if (i->include_ == true && i->mgd_ == true)
+        if (i->include_ == false)
         {
-            if (i->par[0].ro == 0.0)
-            {
-                cout << i->couple_ << " " << i->type << " " << i->Center->x << " " << i->Center->y << " " << i->Center->z << endl;
-                cout << i->number << " " << i->Grans.size() << endl;
-                exit(-1);
-            }
-
-            if (i->par[1].ro == 0.0)
-            {
-                cout << "2 --- " << i->couple_ << " " << i->type << " " << i->Center->x << " " << i->Center->y << " " << i->Center->z << endl;
-                exit(-1);
-            }
+            continue;
         }
-    }
-
-    for (auto& i : this->All_Cell)
-    {
         if (i->i_init_mgd == true)
         {
             double ro = 0.0;
@@ -3955,6 +4211,8 @@ void Setka::Initialization_do_MHD(void)
                 i->par[0].bx = 0.0; // -betta * cos(0.5235);
                 i->par[0].by = 0.0; // -betta * cos(0.5235);
                 i->par[0].bz = 0.0;
+
+                i->par[1] = i->par[0];
             }
             else
             {
@@ -3966,19 +4224,45 @@ void Setka::Initialization_do_MHD(void)
                 i->par[0].bx = bx / kk;
                 i->par[0].by = by / kk;
                 i->par[0].bz = bz / kk;
+
+                i->par[1] = i->par[0];
             }
         }
 
     }
-
+    //cout << "I6" << endl;
     for (auto& i : this->All_Cell)
     {
         i->i_init_mgd = false;
     }
+    //cout << "I7" << endl;
+    for (auto& i : this->All_Cell)
+    {
+        if (i->include_ == true && i->mgd_ == true)
+        {
+            if (i->par[0].ro == 0.0)
+            {
+                cout << "daedde" << endl;
+                cout << i->couple_ << " " << i->type << " " << i->Center->x << " " << i->Center->y << " " << i->Center->z << endl;
+                cout << i->number << " " << i->Grans.size() << endl;
+                exit(-1);
+            }
 
+            if (i->par[1].ro == 0.0)
+            {
+                cout << "daedde2" << endl;
+                cout << "2 --- " << i->couple_ << " " << i->type << " " << i->i_init_mgd << " " << i->Center->x << " " << i->Center->y << " " << i->Center->z << endl;
+                exit(-1);
+            }
+        }
+    }
+    //cout << "I8" << endl;
     this->Calc_normal();
+    //cout << "I9" << endl;
     this->Calc_normal2();
+    //cout << "I10" << endl;
     this->Calc_normal();
+    //cout << "I11" << endl;
 }
 
 void Setka::Go_MHD(int times)
@@ -3986,13 +4270,15 @@ void Setka::Go_MHD(int times)
     cout << "Go_MHD   " << times << endl;
     int now1 = 1;
     int now2 = 0;
+    int ow1 = 1;
+    int ow2 = 0;
     double T[2];
     T[0] = T[1] = 0.00000001;
     mutex mut;
 
-    for (int st = 0; st <= times; st++)
+    for (int st = 0; st < times; st++)
     {
-        if (st % 100 == 0 && st > 0)
+        if (st % 300 == 0 && st > 0)
         {
             cout << "Go_MHD    " << st << " " << T[now2] << endl;
         }
@@ -4037,7 +4323,11 @@ void Setka::Go_MHD(int times)
 
             for (auto& i : K->Grans)
             {
-                int mm = 3;                                                          // Метод  ---------------------------------------
+                int mm = 2;                                                          // Метод 3 ---------------------------------------
+                /*if (fabs(z) > 8.0)
+                {
+                    mm = 2;
+                }*/
                 double ro2, p2, vx2, vy2, vz2, bx2, by2, bz2;
                 
                 if (r < 1.5)
@@ -4056,6 +4346,20 @@ void Setka::Go_MHD(int times)
                     bx2 = i->Sosed->par[now1].bx;
                     by2 = i->Sosed->par[now1].by;
                     bz2 = i->Sosed->par[now1].bz;
+
+                    if (K->couple_ == true && i->Sosed->couple_ == true)
+                    {
+                        if (K->n_cop == i->Sosed->n_cop)
+                        {
+                            mm = 2;
+                        }
+
+                        if (K->Par->A1->number == i->Sosed->number || K->Par->A2->number == i->Sosed->number)
+                        {
+                            mm = 3;
+                        }
+                    }
+
                 }
                 else
                 {
@@ -4079,6 +4383,28 @@ void Setka::Go_MHD(int times)
 
                 }
 
+                // Приём для магнитных полей
+                double bx1 = bx, by1 = by, bz1 = bz;
+                if (normB)
+                {
+                    if (K->couple_ == true && i->Sosed->couple_ == true)
+                    {
+                        if (K->Par->A1->number == i->Sosed->number || K->Par->A2->number == i->Sosed->number)
+                        {
+                            double nm;
+                            nm = bx * n1 + by * n2 + bz * n3;
+                            bx1 = bx1 - nm * n1;
+                            by1 = by1 - nm * n2;
+                            bz1 = bz1 - nm * n3;
+
+                            nm = bx2 * n1 + by2 * n2 + bz2 * n3;
+                            bx2 = bx2 - nm * n1;
+                            by2 = by2 - nm * n2;
+                            bz2 = bz2 - nm * n3;
+                        }
+                    }
+                }
+
                 S = i->S;
                 n1 = i->n1;
                 n2 = i->n2;
@@ -4094,11 +4420,11 @@ void Setka::Go_MHD(int times)
                 double Vc;
                 if (mm == 3 || mm == 2)
                 {
-                    tmin = min(tmin, HLLDQ_Korolkov(ro, 1.0, p, vx, vy, vz, bx, by, bz, ro2, 1.0, p2, vx2, vy2, vz2, bx2, by2, bz2, P, PQ, n1, n2, n3, dist, mm, Vc));
+                    tmin = min(tmin, HLLDQ_Korolkov(ro, 1.0, p, vx, vy, vz, bx1, by1, bz1, ro2, 1.0, p2, vx2, vy2, vz2, bx2, by2, bz2, P, PQ, n1, n2, n3, dist, mm, Vc));
                 }
                 else
                 {
-                    tmin = min(tmin, HLLD_Alexashov(ro, p, vx, vy, vz, bx, by, bz, ro2, p2, vx2, vy2, vz2, bx2, by2, bz2, P, n1, n2, n3, dist, mm, Vc));
+                    tmin = min(tmin, HLLD_Alexashov(ro, p, vx, vy, vz, bx1, by1, bz1, ro2, p2, vx2, vy2, vz2, bx2, by2, bz2, P, n1, n2, n3, dist, mm, Vc));
                 }
                 for (int k = 0; k < 8; k++)  // Суммируем все потоки в ячейке
                 {
@@ -4149,6 +4475,131 @@ void Setka::Go_MHD(int times)
 
         }
 
+        ow1 = now1;
+        ow2 = now2;
+
+        if (st > 1 && st % 7000 == 0)
+        {
+            // Очищаем дивергенцию
+            for (int ik = 0; ik < 500; ik++)
+            {
+                double newyazka = 0.0;
+                //cout << "ik = " << ik << endl;
+                ow1 = (ow1 + 1) % 2; // Какие параметры сейчас берём
+                ow2 = (ow2 + 1) % 2; // Какие параметры сейчас меняем
+
+#pragma omp parallel for
+                for (int ii = 0; ii < this->All_Cell.size(); ii++)
+                {
+                    auto K = this->All_Cell[ii];
+                    double divS = 0.0;
+                    if (K->mgd_ == false)
+                    {
+                        continue;
+                    }
+
+                    if (ik == 0)
+                    {
+                        K->par[now2].divB = 0;
+                        K->par[now2].sivi = 0;
+                    }
+
+                    double bx = K->par[now2].bx;
+                    double by = K->par[now2].by;
+                    double bz = K->par[now2].bz;
+                    double Volume = 0.0;
+                    K->get_Volume(Volume);
+
+                    double bx2, by2, bz2, sks, dist;
+                    double x, y, z;
+                    K->Center->get(x, y, z);
+
+                    for (auto& i : K->Grans)
+                    {
+                        if (i->Sosed->type == C_base)
+                        {
+                            bx2 = i->Sosed->par[now2].bx;
+                            by2 = i->Sosed->par[now2].by;
+                            bz2 = i->Sosed->par[now2].bz;
+                        }
+                        else
+                        {
+                            bx2 = bx;
+                            by2 = by;
+                            bz2 = bz;
+                        }
+
+                        if (ik == 0)
+                        {
+                            double x2, y2, z2;
+                            i->Sosed->Center->get(x2, y2, z2);
+                            i->dl = sqrt(kv(x - x2) + kv(y - y2) + kv(z - z2));
+                        }
+
+                        if (ik == 0)
+                        {
+                            sks = i->n1 * (bx + bx2) / 2.0 + i->n2 * (by + by2) / 2.0 + i->n3 * (bz + bz2) / 2.0;
+                            K->par[now2].divB = K->par[now2].divB + sks * i->S;
+                            K->par[now2].sivi = K->par[now2].sivi + i->S / i->dl;
+                        }
+                        divS = divS + i->Sosed->par[ow1].phi * i->S / i->dl;
+                    }
+
+                    K->par[ow2].phi = (divS - K->par[now2].divB * Volume) / K->par[now2].sivi;
+                    newyazka = max(newyazka, fabs(K->par[ow2].phi - K->par[ow1].phi));
+
+                    if (ik == 0)
+                    {
+                        K->par[now1].divB = K->par[now2].divB;  // Для себя сохранил дивергенцию поля
+                    }
+                }
+
+                if (ik % 100 == 0)
+                {
+                    cout << "newyazka = " << newyazka << "   step = " << ik << endl;
+                }
+            }
+
+#pragma omp parallel for
+            for (int ii = 0; ii < this->All_Cell.size(); ii++)
+            {
+                auto K = this->All_Cell[ii];
+                double divS = 0.0;
+                if (K->mgd_ == false)
+                {
+                    continue;
+                }
+
+                double ph1 = 0.0, ph2 = 0.0, ph3 = 0.0;
+
+                double Volume = 0.0;
+                K->get_Volume(Volume);
+
+                bool granich = false;
+
+                for (auto& i : K->Grans)
+                {
+                    if (i->Sosed->type != C_base)
+                    {
+                        granich = true;
+                        continue;
+                    }
+
+                    ph1 = ph1 + 0.5 * (i->Sosed->par[ow2].phi + K->par[ow2].phi) * i->S * i->n1;
+                    ph2 = ph2 + 0.5 * (i->Sosed->par[ow2].phi + K->par[ow2].phi) * i->S * i->n2;
+                    ph3 = ph3 + 0.5 * (i->Sosed->par[ow2].phi + K->par[ow2].phi) * i->S * i->n3;
+                }
+
+                if (granich == false)
+                {
+                    K->par[now1].bx = K->par[now2].bx = K->par[now2].bx - ph1 / Volume;
+                    K->par[now1].by = K->par[now2].by = K->par[now2].by - ph2 / Volume;
+                    K->par[now1].bz = K->par[now2].bz = K->par[now2].bz - ph3 / Volume;
+                }
+            }
+
+        }
+
     }
 }
 
@@ -4158,6 +4609,7 @@ void Setka::Culc_couple(int now1, const double& time)
     for (auto& i : this->All_Couple)
     {
         auto K = i->A1;
+        K->n_cop = 1;
         double ro = K->par[now1].ro;
         double p = K->par[now1].p;
         double vx = K->par[now1].u;
@@ -4168,6 +4620,7 @@ void Setka::Culc_couple(int now1, const double& time)
         double bz = K->par[now1].bz;
         double ro2, p2, vx2, vy2, vz2, bx2, by2, bz2;
         K = i->A2;
+        K->n_cop = 2;
         ro2 = K->par[now1].ro;
         p2 = K->par[now1].p;
         vx2 = K->par[now1].u;
@@ -4181,6 +4634,22 @@ void Setka::Culc_couple(int now1, const double& time)
         n2 = i->n2;
         n3 = i->n3;
 
+
+        // Приём для магнитных полей
+        if (normB)
+        {
+            double nm;
+            nm = bx * n1 + by * n2 + bz * n3;
+            bx = bx - nm * n1;
+            by = by - nm * n2;
+            bz = bz - nm * n3;
+
+            nm = bx2 * n1 + by2 * n2 + bz2 * n3;
+            bx2 = bx2 - nm * n1;
+            by2 = by2 - nm * n2;
+            bz2 = bz2 - nm * n3;
+        }
+
         double P[8] = { 0.0 };
         P[0] = P[1] = P[2] = P[3] = P[4] = P[5] = P[6] = P[7] = 0.0;
         double PQ = 0.0;
@@ -4188,10 +4657,15 @@ void Setka::Culc_couple(int now1, const double& time)
 
         HLLDQ_Korolkov(ro, 1.0, p, vx, vy, vz, bx, by, bz, ro2, 1.0, p2, vx2, vy2, vz2, bx2, by2, bz2, P, PQ, n1, n2, n3, 1.0, 3, Vc, 0.0);
         
-        Vc = Vc * time;
+        Vc = Vc * time * 0.3;  // 0.3
         //cout << Vc << endl;
-        i->A1->Center->move(n1 * Vc, n2 * Vc, n3 * Vc);  // Сразу передвинули пару
-        i->A2->Center->move(n1 * Vc, n2 * Vc, n3 * Vc);
+
+        i->dvig1 = n1 * Vc;
+        i->dvig2 = n2 * Vc;
+        i->dvig3 = n3 * Vc;
+
+        //i->A1->Center->move(n1 * Vc, n2 * Vc, n3 * Vc);  // Сразу передвинули пару
+        //i->A2->Center->move(n1 * Vc, n2 * Vc, n3 * Vc);
     }
 }
 
@@ -4211,6 +4685,8 @@ void Setka::Start_MHD(int times)
     cout << "Start_MHD   " << times << endl;
     int now1 = 1;
     int now2 = 0;
+    int ow1 = 0;
+    int ow2 = 0;
     double T[2];
     T[0] = T[1] = 0.00000001;
     mutex mut;
@@ -4218,7 +4694,7 @@ void Setka::Start_MHD(int times)
 
     for (int st = 0; st < times; st++)
     {
-        if (st % 5 == 0)
+        if (st % 10 == 0)
         {
             cout << "Start_MHD    " << st << " " << T[now2] << endl;
         }
@@ -4228,20 +4704,38 @@ void Setka::Start_MHD(int times)
 
        
         
-        this->Culc_couple(now1, T[now1]);    // Считаем движение пар из задачи о распаде разрыва и двигаем их!!!
-        this->Reconstruct_medium3(true);
+        this->Culc_couple(now1, T[now1]);    // Считаем движение пар из задачи о распаде разрыва!!!
+        //this->Reconstruct_medium3(true);
         this->move_par();
         this->Calc_normal();
         bkl = true;
-        do
+        int nmf = 0;
+
+        if (st % 3 == 0)
         {
-            bkl = this->Reconstruct_medium3(true);
-            //cout << "bkl = " << bkl << endl;
-            if (st % 5 == 0)
+            this->Reconstruct_medium4(true);
+        }
+        else
+        {
+            this->Reconstruct_medium4(false);
+
+            do
             {
-                cout << "bkl = " << bkl << endl;
-            }
-        } while (bkl == false);
+                nmf++;
+                bkl = this->Reconstruct_medium4(true);
+                //cout << "bkl = " << bkl << endl;
+                if (st % 10 == 0)
+                {
+                    cout << "bkl = " << bkl << endl;
+                }
+                if (nmf > 10)
+                {
+                    this->Construct_start();
+                    nmf = 0;
+                    bkl = false;
+                }
+            } while (bkl == false);
+        }
 
         //this->Reconstruct_medium3(true);
         //this->Reconstruct_medium3(true);
@@ -4250,6 +4744,8 @@ void Setka::Start_MHD(int times)
         // а старые грани в конце функции очистятся (указатели сотрутся)
         // а если мы не обновим грани, то они просто удаляется
         //cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" << endl;
+
+
 
 #pragma omp parallel for
         for (int ii = 0; ii < this->All_Cell.size(); ii++)
@@ -4311,7 +4807,12 @@ void Setka::Start_MHD(int times)
 
             for (auto& i : K->Grans)
             {
-                int mm = 3;                                                          // Метод  ---------------------------------------
+                int mm = 2;                                                          // Метод 3 ---------------------------------------
+                /*if (fabs(z) > 8.0)
+                {
+                    mm = 2;
+                }*/
+                
                 double ro2, p2, vx2, vy2, vz2, bx2, by2, bz2;
 
                 if (r < 1.5)
@@ -4323,6 +4824,19 @@ void Setka::Start_MHD(int times)
                 i->Sosed->Center->get_do(x2_do, y2_do, z2_do);
                 if (i->Sosed->type == C_base)
                 {
+                    if (K->couple_ == true && i->Sosed->couple_ == true)
+                    {
+                        if (K->n_cop == i->Sosed->n_cop)
+                        {
+                            mm = 2;
+                        }
+
+                        if (K->Par->A1->number == i->Sosed->number || K->Par->A2->number == i->Sosed->number)
+                        {
+                            mm = 3;
+                        }
+                    }
+
                     if (i->Sosed->couple_ == true)
                     {
                         K->near_par = true;
@@ -4350,6 +4864,20 @@ void Setka::Start_MHD(int times)
                     if (i->Sosed->type == C_wall_x_min)
                     {
                         vx2 = -M_inf;
+                    }
+                    else if (i->Sosed->type == C_wall_z_max)
+                    {
+                        if (vz2 < 0.0)
+                        {
+                            vz2 = 0.0;
+                        }
+                    }
+                    else if (i->Sosed->type == C_wall_z_min)
+                    {
+                        if (vz2 > 0.0)
+                        {
+                            vz2 = 0.0;
+                        }
                     }
 
                     if (i->Sosed->type != C_sphere)
@@ -4397,6 +4925,28 @@ void Setka::Start_MHD(int times)
 
                 //cout << wv << endl;
 
+                // Приём для магнитных полей
+                double bx1 = bx, by1 = by, bz1 = bz;
+                if (normB)
+                {
+                    if (K->couple_ == true && i->Sosed->couple_ == true)
+                    {
+                        if (K->Par->A1->number == i->Sosed->number || K->Par->A2->number == i->Sosed->number)
+                        {
+                            double nm;
+                            nm = bx * n1 + by * n2 + bz * n3;
+                            bx1 = bx1 - nm * n1;
+                            by1 = by1 - nm * n2;
+                            bz1 = bz1 - nm * n3;
+
+                            nm = bx2 * n1 + by2 * n2 + bz2 * n3;
+                            bx2 = bx2 - nm * n1;
+                            by2 = by2 - nm * n2;
+                            bz2 = bz2 - nm * n3;
+                        }
+                    }
+                }
+
                 /*if (r < 1.4)
                 {
                     mm = 1;
@@ -4404,11 +4954,11 @@ void Setka::Start_MHD(int times)
                 double PQ;
                 if (mm == 3 || mm == 2)
                 {
-                    tmin = min(tmin, HLLDQ_Korolkov(ro, 1.0, p, vx, vy, vz, bx, by, bz, ro2, 1.0, p2, vx2, vy2, vz2, bx2, by2, bz2, P, PQ, n1, n2, n3, dist, mm, wv));
+                    tmin = min(tmin, HLLDQ_Korolkov(ro, 1.0, p, vx, vy, vz, bx1, by1, bz1, ro2, 1.0, p2, vx2, vy2, vz2, bx2, by2, bz2, P, PQ, n1, n2, n3, dist, mm, wv));
                 }
                 else
                 {
-                    tmin = min(tmin, HLLD_Alexashov(ro, p, vx, vy, vz, bx, by, bz, ro2, p2, vx2, vy2, vz2, bx2, by2, bz2, P, n1, n2, n3, dist, mm, wv));
+                    tmin = min(tmin, HLLD_Alexashov(ro, p, vx, vy, vz, bx1, by1, bz1, ro2, p2, vx2, vy2, vz2, bx2, by2, bz2, P, n1, n2, n3, dist, mm, wv));
                 }
                 for (int k = 0; k < 8; k++)  // Суммируем все потоки в ячейке
                 {
@@ -4483,12 +5033,263 @@ void Setka::Start_MHD(int times)
         }
         // Нужен также алгоритм пересмотра кандидатов на реконструкцию
         // + также нужен алгоритм для включения отключенных ячеек и выключения включённых
+
+
+        ow1 = now1;
+        ow2 = now2;
+
+        if (st > 1 && st % 1000 == 0)
+        {
+            for (int ik = 0; ik < 1000; ik++)
+            {
+                double newyazka = 0.0;
+                //cout << "ik = " << ik << endl;
+                ow1 = (ow1 + 1) % 2; // Какие параметры сейчас берём
+                ow2 = (ow2 + 1) % 2; // Какие параметры сейчас меняем
+
+#pragma omp parallel for
+                for (int ii = 0; ii < this->All_Cell.size(); ii++)
+                {
+                    auto K = this->All_Cell[ii];
+                    double divS = 0.0;
+                    if (K->mgd_ == false)
+                    {
+                        continue;
+                    }
+
+                    if (ik == 0)
+                    {
+                        K->par[now2].divB = 0;
+                        K->par[now2].sivi = 0;
+                    }
+
+                    double bx = K->par[now2].bx;
+                    double by = K->par[now2].by;
+                    double bz = K->par[now2].bz;
+                    double Volume = 0.0;
+                    K->get_Volume(Volume);
+
+                    double bx2, by2, bz2, sks, dist;
+                    double x, y, z;
+                    K->Center->get(x, y, z);
+
+                    for (auto& i : K->Grans)
+                    {
+                        if (i->Sosed->type == C_base)
+                        {
+                            bx2 = i->Sosed->par[now2].bx;
+                            by2 = i->Sosed->par[now2].by;
+                            bz2 = i->Sosed->par[now2].bz;
+                        }
+                        else
+                        {
+                            bx2 = bx;
+                            by2 = by;
+                            bz2 = bz;
+                        }
+
+                        if (ik == 0)
+                        {
+                            double x2, y2, z2;
+                            i->Sosed->Center->get(x2, y2, z2);
+                            i->dl = sqrt(kv(x - x2) + kv(y - y2) + kv(z - z2));
+                        }
+
+                        if (ik == 0)
+                        {
+                            sks = i->n1 * (bx + bx2) / 2.0 + i->n2 * (by + by2) / 2.0 + i->n3 * (bz + bz2) / 2.0;
+                            K->par[now2].divB = K->par[now2].divB + sks * i->S;
+                            K->par[now2].sivi = K->par[now2].sivi + i->S / i->dl;
+                        }
+                        divS = divS + i->Sosed->par[ow1].phi * i->S / i->dl;
+                    }
+
+                    K->par[ow2].phi = (divS - K->par[now2].divB * Volume) / K->par[now2].sivi;
+                    newyazka = max(newyazka, fabs(K->par[ow2].phi - K->par[ow1].phi));
+
+                    if (ik == 0)
+                    {
+                        K->par[now1].divB = K->par[now2].divB;  // Для себя сохранил дивергенцию поля
+                    }
+                }
+
+                if (ik % 49 == 0)
+                {
+                    cout << "newyazka = " << newyazka << "   step = " << ik << endl;
+                }
+            }
+
+#pragma omp parallel for
+            for (int ii = 0; ii < this->All_Cell.size(); ii++)
+            {
+                auto K = this->All_Cell[ii];
+                double divS = 0.0;
+                if (K->mgd_ == false)
+                {
+                    continue;
+                }
+
+                double ph1 = 0.0, ph2 = 0.0, ph3 = 0.0;
+
+                double Volume = 0.0;
+                K->get_Volume(Volume);
+
+                bool granich = false;
+
+                for (auto& i : K->Grans)
+                {
+                    if (i->Sosed->type != C_base)
+                    {
+                        granich = true;
+                        continue;
+                    }
+
+                    ph1 = ph1 + 0.5 * (i->Sosed->par[ow2].phi + K->par[ow2].phi) * i->S * i->n1;
+                    ph2 = ph2 + 0.5 * (i->Sosed->par[ow2].phi + K->par[ow2].phi) * i->S * i->n2;
+                    ph3 = ph3 + 0.5 * (i->Sosed->par[ow2].phi + K->par[ow2].phi) * i->S * i->n3;
+                }
+
+                if (granich == false)
+                {
+                    K->par[now1].bx = K->par[now2].bx = K->par[now2].bx - ph1 / Volume;
+                    K->par[now1].by = K->par[now2].by = K->par[now2].by - ph2 / Volume;
+                    K->par[now1].bz = K->par[now2].bz = K->par[now2].bz - ph3 / Volume;
+                }
+            }
+
+        }
         
+    }
+}
+
+void Setka::Add_par(void)
+{
+    vector <Couple*> All_Couple_;
+
+    for (auto& ii : this->All_Couple)
+    {
+        map <int, Couple*> Nei;
+        vector <Point> NN;
+        NN.reserve(9);
+        double c1, c2, c3;
+
+        ii->get_centr(c1, c2, c3);
+
+        // Сначала ищем всех соседей
+        for (auto& j : ii->A1->Grans)
+        {
+            if (j->Sosed->couple_ == true)
+            {
+                if (j->Sosed->Par != ii)
+                {
+                    Nei.insert(make_pair(j->Sosed->Par->number, j->Sosed->Par));
+                }
+            }
+        }
+
+        for (auto& j : ii->A2->Grans)
+        {
+            if (j->Sosed->couple_ == true)
+            {
+                if (j->Sosed->Par != ii)
+                {
+                    Nei.insert(make_pair(j->Sosed->Par->number, j->Sosed->Par));
+                }
+            }
+        }
+
+
+        int S = Nei.size();
+
+        bool df = true;
+
+        for (auto& j : Nei)
+        {
+            double v1, v2, v3;
+            j.second->get_centr(v1, v2, v3);
+            if (c3 > 0)
+            {
+                if (v3 > c3 + 0.01)
+                {
+                    df = false;
+                }
+            }
+            else
+            {
+                if (v3 < c3 - 0.01)
+                {
+                    df = false;
+                }
+            }
+        }
+
+       /* if (df)
+        {
+            cout << c3 << endl;
+        }*/
+
+
+        if (df)//(S <= 4)
+        {
+            ii->Resolve();
+            double dist = ii->dist;
+            double n1, n2, n3;
+            double x, y, z, x2, y2, z2;
+            ii->get_normal(n1, n2, n3);
+            double dd = 0.06777777777;
+            if (c3 < 0.0)
+            {
+                dd = -0.067777777777;
+            }
+            c3 = c3 + dd;
+            while (fabs(c3) < 9.0)
+            {
+                x = c1 - 0.5 * dist * n1;
+                y = c2 - 0.5 * dist * n2;
+                z = c3 - 0.5 * dist * n3;
+                x2 = c1 + 0.5 * dist * n1;
+                y2 = c2 + 0.5 * dist * n2;
+                z2 = c3 + 0.5 * dist * n3;
+
+                auto A = new Cell(x, y, z);
+                A->type = C_base;
+                A->couple_ = true;
+                A->include_ = true;
+                A->mgd_ = true;
+                A->i_init_mgd = true;
+                this->All_Cell.push_back(A);
+
+                auto B = new Cell(x2, y2, z2);
+                B->type = C_base;
+                B->couple_ = true;
+                B->include_ = true;
+                B->mgd_ = true;
+                B->i_init_mgd = true;
+                this->All_Cell.push_back(B);
+
+                auto Par = new Couple(A, B, dist);
+                A->Par = Par;
+                B->Par = Par;
+                Par->Resolve();
+
+                All_Couple_.push_back(Par);
+                c3 = c3 + dd;
+            }
+
+        }
+
+    }
+
+
+    for (auto& ii : All_Couple_)
+    {
+        this->All_Couple.push_back(ii);
     }
 }
 
 void Setka::Rebuild(void)
 {
+    cout << "Rebuild" << endl;
     this->Initialization_do_MHD();
     for (auto& ii : this->All_Couple)
     {
@@ -4532,6 +5333,7 @@ void Setka::Rebuild(void)
 
     bool bkl = true;
     this->include_cells();
+    this->renumber();
     this->Construct_start();
     do
     {
@@ -4553,6 +5355,8 @@ void Setka::Rebuild(void)
     //this->Initialization_do_MHD();
 
     this->exclude_cells();
+    this->renumber();
+    this->Construct_start();
     do
     {
         bkl = this->Reconstruct_medium4(true);
@@ -4575,150 +5379,62 @@ void Setka::Rebuild(void)
 
 void Setka::Zapusk(void)
 {
+    cout << "ZAPUSK" << endl;
     this->Initialization_do_MHD();
-    cout << " bbb  =  " << this->Reconstruct_medium3(true) << endl;
     bool bkl = true;
     do
     {
         bkl = this->Reconstruct_medium4(true);
         cout << "reconstruct_4 = " << bkl << endl;
     } while (bkl == false);
-
+    this->Initialization_do_MHD();
+    cout << " 11111111  " << endl;
+    
+    do
+    {
+        bkl = this->Reconstruct_medium4(true);
+        cout << "reconstruct_4 = " << bkl << endl;
+    } while (bkl == false);
+    cout << " 22222222  " << endl;
     this->Rebuild();
 
     this->Initialization_do_MHD();
-    this->Init();
-    this->Go_MHD(5000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
+    cout << " 33333333  " << endl;
     do
     {
         bkl = this->Reconstruct_medium4(true);
         cout << "reconstruct_4 = " << bkl << endl;
     } while (bkl == false);
 
-    this->Rebuild();
+    //this->Go_MHD(200000);
+    //this->Save_setka("vers_2");
 
-    this->Initialization_do_MHD();
-    this->Init();
-    cout << "SECTION 2" << endl;
-    this->Go_MHD(5000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    do
+    for (int i = 0; i < 10; i++)
     {
-        bkl = this->Reconstruct_medium4(true);
-        cout << "reconstruct_4 = " << bkl << endl;
-    } while (bkl == false);
+        cout << "Cicle  " << i << endl;
+        this->Go_MHD(10000);
+        this->Start_MHD(350);
+        //this->Go_MHD(500);
+        //this->Start_MHD(100);
+        do
+        {
+            bkl = this->Reconstruct_medium4(true);
+            cout << "reconstruct_4 = " << bkl << endl;
+        } while (bkl == false);
 
-    this->Rebuild();
+        this->Rebuild();
 
-    this->Initialization_do_MHD();
-    this->Init();
-    cout << "SECTION 3" << endl;
-    this->Go_MHD(5000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    do
-    {
-        bkl = this->Reconstruct_medium4(true);
-        cout << "reconstruct_4 = " << bkl << endl;
-    } while (bkl == false);
+        this->Initialization_do_MHD();
+        //this->Init();
+        do
+        {
+            bkl = this->Reconstruct_medium4(true);
+            cout << "reconstruct_4 = " << bkl << endl;
+        } while (bkl == false);
 
-    this->Save_setka("vers_8");
+        this->Save_setka("vers_c");
+    }
 
-    this->Rebuild();
-
-    this->Initialization_do_MHD();
-    this->Init();
-    cout << "SECTION 4" << endl;
-    this->Go_MHD(5000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    do
-    {
-        bkl = this->Reconstruct_medium4(true);
-        cout << "reconstruct_4 = " << bkl << endl;
-    } while (bkl == false);
-
-    this->Rebuild();
-
-    this->Initialization_do_MHD();
-    this->Init();
-    cout << "SECTION 5" << endl;
-    this->Go_MHD(5000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    do
-    {
-        bkl = this->Reconstruct_medium4(true);
-        cout << "reconstruct_4 = " << bkl << endl;
-    } while (bkl == false);
-
-    this->Save_setka("vers_9");
-
-    this->Rebuild();
-
-    this->Initialization_do_MHD();
-    this->Init();
-    cout << "SECTION 6" << endl;
-    this->Go_MHD(5000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    do
-    {
-        bkl = this->Reconstruct_medium4(true);
-        cout << "reconstruct_4 = " << bkl << endl;
-    } while (bkl == false);
-
-    this->Rebuild();
-
-    this->Initialization_do_MHD();
-    this->Init();
-    cout << "SECTION 7" << endl;
-    this->Go_MHD(5000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    this->Go_MHD(1000);
-    this->Start_MHD(100);
-    do
-    {
-        bkl = this->Reconstruct_medium4(true);
-        cout << "reconstruct_4 = " << bkl << endl;
-    } while (bkl == false);
-
-    this->Save_setka("vers_10");
-
-    this->Rebuild();
-
-    this->Initialization_do_MHD();
-    this->Init();
-    cout << "SECTION 8" << endl;
-    this->Go_MHD(5000);
-    this->Start_MHD(300);
-
-    //this->Rebuild();
-
-    this->Initialization_do_MHD();
 }
 
 void Setka::Save_MHD(string name_f)
@@ -4752,7 +5468,7 @@ void Setka::Download_MHD(string name_f)
 
 void Setka::Init(void)
 {
-
+    cout << "INIT" << endl;
     double x, y, z, r;
     for (auto& i : this->All_Cell)
     {

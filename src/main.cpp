@@ -4,10 +4,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fstream>
-
+#include <iterator>
 #include "Help.h"
 #include "Setka.h"
 #include "Cell.h"
+
+class Couple;
 
 
 // Гид по примерам
@@ -49,24 +51,173 @@ int sign(double x)
 
 int main()
 {
-	Setka B = Setka("vers_7");
-	//B.Download_MHD("Vers_1.txt");
-	//B.Cut_Plane_y_Tecplot(1.0);
-	//B.Cut_Plane_y(1.0);
-	//B.Cut_Surface();
-	//exit(-1);
-	//B.Calc_normal();
-	B.Reconstruct_medium2();
-	B.Reconstruct_medium2();
-	B.Reconstruct_medium2();
-	B.Zapusk();
-	B.Save_setka("vers_11");
-	B.Cut_Plane_z(1.0);
-	B.Cut_Plane_y(1.0);
-	B.Cut_Surface();
-	B.Cut_Plane_z_Tecplot(1.0);
-	B.Cut_Plane_y_Tecplot(1.0);
-	exit(-1);
+	if (true)
+	{
+		Setka B = Setka("vers_9");
+
+		B.Initialization_do_MHD();
+
+		//B.Calc_normal();
+		//B.Construct_start();
+		bool bkl = true;
+		if (false)
+		{
+			B.Add_par();
+			B.renumber();
+			B.Construct_start();
+			B.Rebuild();
+			B.Calc_normal();
+			bool bkl = true;
+			do
+			{
+				bkl = B.Reconstruct_medium4(true);
+				cout << "bkl = " << bkl << endl;
+			} while (bkl == false);
+			B.Calc_normal2();
+			bkl = true;
+			do
+			{
+				bkl = B.Reconstruct_medium4(true);
+				cout << "bkl = " << bkl << endl;
+			} while (bkl == false);
+			B.Calc_normal();
+			bkl = true;
+			do
+			{
+				bkl = B.Reconstruct_medium4(true);
+				cout << "bkl = " << bkl << endl;
+			} while (bkl == false);
+		}
+
+		for (int iii = 0; iii < 0; iii++)
+		{
+			B.Smooth();
+			do
+			{
+				bkl = B.Reconstruct_medium4(true);
+				cout << "bkl = " << bkl << endl;
+			} while (bkl == false);
+			B.Calc_normal();
+			do
+			{
+				bkl = B.Reconstruct_medium4(true);
+				cout << "bkl = " << bkl << endl;
+			} while (bkl == false);
+			B.Calc_normal2();
+			do
+			{
+				bkl = B.Reconstruct_medium4(true);
+				cout << "bkl = " << bkl << endl;
+			} while (bkl == false);
+			B.Calc_normal();
+			do
+			{
+				bkl = B.Reconstruct_medium4(true);
+				cout << "bkl = " << bkl << endl;
+			} while (bkl == false);
+		}
+
+		if (false)
+		{
+			int yuyu = 0;
+			for (auto& ii : B.All_Couple)
+			{
+				if (ii->A1->include_ == false)
+				{
+					continue;
+				}
+
+				map <int, Couple*> Nei;
+				double x, y, z;
+				double x2, y2, z2;
+
+				ii->get_centr(x, y, z);
+
+				// Сначала ищем всех соседей
+				for (auto& j : ii->A1->Grans)
+				{
+					if (j->Sosed->couple_ == true && j->Sosed->include_ == true)
+					{
+						if (j->Sosed->Par != ii)
+						{
+							Nei.insert(make_pair(j->Sosed->Par->number, j->Sosed->Par));
+						}
+					}
+				}
+
+				for (auto& j : ii->A2->Grans)
+				{
+					if (j->Sosed->couple_ == true && j->Sosed->include_ == true)
+					{
+						if (j->Sosed->Par != ii)
+						{
+							Nei.insert(make_pair(j->Sosed->Par->number, j->Sosed->Par));
+						}
+					}
+				}
+
+
+
+				for (auto& i : Nei)
+				{
+					i.second->get_centr(x2, y2, z2);
+					double a1, a2, a3;
+					a1 = (x2 - x);
+					a2 = (y2 - y);
+					a3 = (z2 - z);
+					double aa = sqrt(kv(a1) + kv(a2) + kv(a3));
+					a1 = a1 / aa;
+					a2 = a2 / aa;
+					a3 = a3 / aa;
+					if (fabs(a1 * ii->n1 + a2 * ii->n2 + a3 * ii->n3) > 0.52)
+					{
+						yuyu++;
+						yuyu++;
+						i.second->A1->include_ = false;
+						i.second->A1->Candidates.clear();
+						i.second->A1->Grans.clear();
+						i.second->A2->include_ = false;
+						i.second->A2->Candidates.clear();
+						i.second->A2->Grans.clear();
+
+						ii->A1->include_ = false;
+						ii->A1->Candidates.clear();
+						ii->A1->Grans.clear();
+						ii->A2->include_ = false;
+						ii->A2->Candidates.clear();
+						ii->A2->Grans.clear();
+						break;
+					}
+				}
+				Nei.clear();
+			}
+				cout << "Par izolated  " << yuyu << endl;
+			
+		}
+
+
+		//B.Construct_start();
+		//B.Calc_normal();
+
+		do
+		{
+			bkl = B.Reconstruct_medium4(true);
+			cout << "bkl = " << bkl << endl;
+		} while (bkl == false);
+
+
+		B.Zapusk();
+		B.Save_setka("vers_10");
+		//B.Construct_start();
+
+		B.Cut_Plane_z(1.0);
+		B.Cut_Plane_y(1.0);
+		B.Cut_Surface();
+		B.Cut_Plane_z_Tecplot(1.0);
+		B.Cut_Plane_y_Tecplot(1.0);
+
+		exit(-1);
+	}
 
 	Setka A = Setka();
 	A.Construct_start();
@@ -77,25 +228,27 @@ int main()
 	//A.Print_points();
 	A.Construct_start();
 	A.Disable_cells();
-	//A.Construct_start();
-	A.Reconstruct_couple(); 
+	A.Construct_start();
+	/*A.Reconstruct_couple(); 
 	A.Reconstruct_couple();
-	A.Reconstruct_couple(true);
+	A.Reconstruct_couple(true);*/
 	A.set_normal();
 	//A.move_par();
+	/*A.Reconstruct_couple();
 	A.Reconstruct_couple();
-	A.Reconstruct_couple();
-	A.Reconstruct_couple();
+	A.Reconstruct_couple();*/
 	A.Calc_normal();
-	A.Reconstruct_couple();
-	A.Reconstruct_medium2();
+	/*A.Reconstruct_couple();
+	A.Reconstruct_medium2();*/
+
+	A.Init();
+	A.Initialization_do_MHD();
 
 	A.Cut_Plane_z(1.0);
 	A.Cut_Plane_y(1.0);
 	A.Cut_Surface();
 	//A.Cut_Plane_y_Tecplot(1.0);
-	A.Init();
-	A.Download_MHD("Vers_1.txt");
+	//A.Download_MHD("Vers_1.txt");
 	//A.Go_MHD(30);
 	//A.Calc_normal();                           // Проверить в самом начала, мне кажется там что-то не правильно
 	//A.Start_MHD(100);

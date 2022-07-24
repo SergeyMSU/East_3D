@@ -30,6 +30,9 @@ struct Parametr
 	double bx = 0.0;
 	double by = 0.0;
 	double bz = 0.0;
+	double phi = 0.0;
+	double divB = 0.0;
+	double sivi = 0.0;
 };
 
 class Cell
@@ -54,7 +57,10 @@ public:
 	double move2;                   // Вектор сдвига для парных ячеек
 	double move3;                   // Вектор сдвига для парных ячеек
 
+	
+
 	// Управляющие параметры
+	int n_cop = 0;                // Какая она по счёту в паре
 	bool mgd_ = true;             // Нужно ли считать законы сохранения и менять параметры в этой ячейке
 	// Пока не знаю зачем это, это вроде нужно для всех включённых ячеек?!?!?!?
 	bool couple_ = false;         // Является ли ячейка парной?  // очень часто нужно это знать везде
@@ -73,6 +79,7 @@ public:
 	bool i_boundary_2 = false;    // Сосед второго порядка к границе
 	bool i_include_candidate = false;     // Кандидат на отключение
 	bool i_init_mgd = false;
+	bool i_delete = false;                 // Нужно ли удалить ячейку?
 	
 
 	Cell(const double& x, const double& y, const double& z);  // Конструктор сам создаёт центр ячейки в памети и сохраняет указатель на него
