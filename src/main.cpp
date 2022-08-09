@@ -8,6 +8,7 @@
 #include "Help.h"
 #include "Setka.h"
 #include "Cell.h"
+#include <unistd.h>
 
 class Couple;
 
@@ -53,7 +54,11 @@ int main()
 {
 	if (true)
 	{
-		Setka B = Setka("vers_9");
+		cout << "SLEEP" << endl;
+		//sleep(7200);
+		cout << "NOT SLEEP" << endl;
+
+		Setka B = Setka("vers_28");  // 19  до bn
 
 		B.Initialization_do_MHD();
 
@@ -205,9 +210,22 @@ int main()
 			cout << "bkl = " << bkl << endl;
 		} while (bkl == false);
 
+		/*for (auto& i : B.All_Cell)
+		{
+			if (i->Center->x < -4.0)
+			{
+				i->par[0].bx = 0.0;
+				i->par[0].by = 0.0;
+				i->par[0].bz = 0.0;
+				i->par[1].bx = 0.0;
+				i->par[1].by = 0.0;
+				i->par[1].bz = 0.0;
+			}
+		}*/
+
 
 		B.Zapusk();
-		B.Save_setka("vers_10");
+		B.Save_setka("vers_29");
 		//B.Construct_start();
 
 		B.Cut_Plane_z(1.0);

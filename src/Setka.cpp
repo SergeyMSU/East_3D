@@ -2336,17 +2336,20 @@ bool Setka::Reconstruct_medium4(bool wide)
                     if (ney[j] >= 0)
                     {
                         double zz = fabs(z);
-                        if (fabs(this->All_Cell[ney[j]]->Center->z) < zz && zz > 0.6)
+                        if (fabs(this->All_Cell[ney[j]]->Center->z) < zz && zz > 8.0)
                         {
-                            /*if (zz < 3.834)
-                            {
-                                kkk = zz * zz * zz * 1.5 * exp(-zz * zz / 4.0) + 1.0;
-                            }
-                            else
-                            {
-                                kkk = 3.834 * 3.834 * 3.834 * 1.5 * exp(-3.834 * 3.834 / 4.0) + 1.0;
-                            }*/
-
+                            kkk = 1.6;
+                        }
+                        else if (fabs(this->All_Cell[ney[j]]->Center->z) < zz && zz > 6.0)
+                        {
+                            kkk = 1.5;
+                        }
+                        else if (fabs(this->All_Cell[ney[j]]->Center->z) < zz && zz > 2.0)
+                        {
+                            kkk = 1.4;
+                        }
+                        else if (fabs(this->All_Cell[ney[j]]->Center->z) < zz && zz > 0.6)
+                        {
                             kkk = 1.3;
                         }
                         else if (fabs(this->All_Cell[ney[j]]->Center->z) < zz && zz > 0.4)
@@ -2421,6 +2424,7 @@ bool Setka::Reconstruct_medium4(bool wide)
             }
 
             int bnk2 = 0;
+            i->extern_boundary = false;
             for (int j = 0; j < ney.size(); j++)
             {
                 auto A = new Gran();
@@ -2429,7 +2433,7 @@ bool Setka::Reconstruct_medium4(bool wide)
                 A->n2 = norm[j * 3 + 1];
                 A->n3 = norm[j * 3 + 2];
 
-
+                
                 if (ney[j] >= 0)
                 {
                     A->Sosed = this->All_Cell[ney[j]];
@@ -2443,30 +2447,37 @@ bool Setka::Reconstruct_medium4(bool wide)
                 else if (ney[j] == -1)
                 {
                     A->Sosed = this->Wall1;
+                    i->extern_boundary = true;
                 }
                 else if (ney[j] == -2)
                 {
                     A->Sosed = this->Wall2;
+                    i->extern_boundary = true;
                 }
                 else if (ney[j] == -3)
                 {
                     A->Sosed = this->Wall3;
+                    i->extern_boundary = true;
                 }
                 else if (ney[j] == -4)
                 {
                     A->Sosed = this->Wall4;
+                    i->extern_boundary = true;
                 }
                 else if (ney[j] == -5)
                 {
                     A->Sosed = this->Wall5;
+                    i->extern_boundary = true;
                 }
                 else if (ney[j] == -6)
                 {
                     A->Sosed = this->Wall6;
+                    i->extern_boundary = true;
                 }
                 else if (ney[j] == -7)
                 {
                     A->Sosed = this->Wall7;
+                    i->extern_boundary = true;
                 }
                 else
                 {
@@ -3133,8 +3144,12 @@ void Setka::Calc_normal(void)
         {
             continue;
         }
+        ii->extern_boundary = (ii->A1->extern_boundary || ii->A2->extern_boundary);
+
         double v1, v2, v3;
         double dv1, dv2, dv3;
+        double x_now, y_now, z_now;
+        ii->get_centr(x_now, y_now, z_now);
         int kl = 3;
         dv1 = 3.0 * ii->dvig1;
         dv2 = 3.0 * ii->dvig2;
@@ -3143,9 +3158,9 @@ void Setka::Calc_normal(void)
         v2 = ii->n2;
         v3 = ii->n3;
         //cout << "do = " << v1 << " " << v2 << " " << v3 << endl;
-        ii->n1 = 0.0;
+        /*ii->n1 = 0.0;
         ii->n2 = 0.0;
-        ii->n3 = 0.0;
+        ii->n3 = 0.0;*/
         map <int, Couple*> Nei;
         vector <Point> NN;
         NN.reserve(9);
@@ -3198,16 +3213,35 @@ void Setka::Calc_normal(void)
             continue;
         }
 
+        double X_m = 0.0, Y_m = 0.0, Z_m = 0.0;
+
+        int jkjk = 0;
         for (auto& kk : Nei)
         {
             kk.second->get_centr(x, y, z);
             NN.push_back(Point(x, y, z));
+            X_m += x;
+            Y_m += y;
+            Z_m += z;
+            jkjk++;
+            
         }
+
+        X_m = X_m / jkjk;
+        Y_m = Y_m / jkjk;
+        Z_m = Z_m / jkjk;
+
+        ii->get_centr(x, y, z);
+
+        double skk = (X_m - x) * v1 + (Y_m - y) * v2 + (Z_m - z) * v3;
+
+        ii->tension_x = skk * v1;
+        ii->tension_y = skk * v2;
+        ii->tension_z = skk * v3;
 
         if (S == 2)
         {
             S = 3;
-            ii->get_centr(x, y, z);
             NN.push_back(Point(x, y, z));
         }
 
@@ -3229,14 +3263,8 @@ void Setka::Calc_normal(void)
                     d1 = sqrt(kv(a) + kv(c) + kv(e));
                     d2 = sqrt(kv(b) + kv(d) + kv(f));
 
-                    if (fabs(a * b + c * d + e * f) / (d1 * d2) > 0.8)
+                    if (fabs(a * b + c * d + e * f) / (d1 * d2) > 0.7)
                     {
-                        if (bnv == false)
-                        {
-                            ii->n1 += v1;
-                            ii->n2 += v2;
-                            ii->n3 += v3;
-                        }
                         continue;
                     }
 
@@ -3250,28 +3278,6 @@ void Setka::Calc_normal(void)
                     n3 = n3 / nn;
 
                     
-
-                    /*if (n3 > 0.1)
-                    {
-                        cout << "ERROR  " << NN[i].x << " " << NN[i].y << " " << NN[i].z << endl;
-                        cout << NN[j].x << " " << NN[j].y << " " << NN[j].z << endl;
-                        cout << NN[k].x << " " << NN[k].y << " " << NN[k].z << endl;
-                    }*/
-                    /*if (i == 0 && j == 1 && k == 2)
-                    {
-                        if (v1 * n1 + v2 * n2 + v3 * n3 >= 0.0)
-                        {
-                            v1 = n1;
-                            v2 = n2;
-                            v3 = n3;
-                        }
-                        else
-                        {
-                            v1 = -n1;
-                            v2 = -n2;
-                            v3 = -n3;
-                        }
-                    }*/
 
                     if (v1 * n1 + v2 * n2 + v3 * n3 >= 0.0)
                     {
@@ -3322,6 +3328,26 @@ void Setka::Calc_normal(void)
         {
             continue;
         }
+
+        // Натяжение поверхности
+        if (true)//(ii->extern_boundary == false)
+        {
+            double x, y, z;
+            ii->get_centr(x, y, z);
+
+            ii->A1->Center->move(ii->tension_x* tens_, ii->tension_y* tens_, ii->tension_z* tens_);  // Сразу передвинули пару
+            ii->A2->Center->move(ii->tension_x* tens_, ii->tension_y* tens_, ii->tension_z* tens_);
+            
+        }
+
+        /*if (ii->extern_boundary == true)
+        {
+            ii->n3 = 0.0;
+            double nn = sqrt(kv(ii->n1) + kv(ii->n2));
+            ii->n1 = ii->n1 / nn;
+            ii->n2 = ii->n2 / nn;
+        }*/
+
         ii->orient();
         ii->A1->Center->move(ii->mo1, ii->mo2, ii->mo3);  // Сразу передвинули пару
         ii->A2->Center->move(ii->mo1, ii->mo2, ii->mo3);
@@ -4323,8 +4349,8 @@ void Setka::Go_MHD(int times)
 
             for (auto& i : K->Grans)
             {
-                int mm = 2;                                                          // Метод 3 ---------------------------------------
-                /*if (fabs(z) > 8.0)
+                int mm = 3;                                                          // Метод 3 ---------------------------------------
+                /*if (fabs(z) > 6.0)
                 {
                     mm = 2;
                 }*/
@@ -4371,6 +4397,7 @@ void Setka::Go_MHD(int times)
                     bx2 = bx;
                     by2 = by;
                     bz2 = bz;
+
                     if (i->Sosed->type == C_wall_x_min)
                     {
                         vx2 = -M_inf;
@@ -4401,6 +4428,14 @@ void Setka::Go_MHD(int times)
                             bx2 = bx2 - nm * n1;
                             by2 = by2 - nm * n2;
                             bz2 = bz2 - nm * n3;
+
+                            i->Sosed->par[now1].bx = bx2;
+                            i->Sosed->par[now1].by = by2;
+                            i->Sosed->par[now1].bz = bz2;
+
+                            K->par[now1].bx = bx1;
+                            K->par[now1].by = by1;
+                            K->par[now1].bz = bz1;
                         }
                     }
                 }
@@ -4481,7 +4516,7 @@ void Setka::Go_MHD(int times)
         if (st > 1 && st % 7000 == 0)
         {
             // Очищаем дивергенцию
-            for (int ik = 0; ik < 500; ik++)
+            for (int ik = 0; ik < 900; ik++)
             {
                 double newyazka = 0.0;
                 //cout << "ik = " << ik << endl;
@@ -4633,7 +4668,8 @@ void Setka::Culc_couple(int now1, const double& time)
         n1 = i->n1;
         n2 = i->n2;
         n3 = i->n3;
-
+        double x, y, z;
+        i->get_centr(x, y, z);
 
         // Приём для магнитных полей
         if (normB)
@@ -4648,6 +4684,14 @@ void Setka::Culc_couple(int now1, const double& time)
             bx2 = bx2 - nm * n1;
             by2 = by2 - nm * n2;
             bz2 = bz2 - nm * n3;
+
+            i->A2->par[now1].bx = bx2;
+            i->A2->par[now1].by = by2;
+            i->A2->par[now1].bz = bz2;
+
+            i->A1->par[now1].bx = bx;
+            i->A1->par[now1].by = by;
+            i->A1->par[now1].bz = bz;
         }
 
         double P[8] = { 0.0 };
@@ -4657,7 +4701,7 @@ void Setka::Culc_couple(int now1, const double& time)
 
         HLLDQ_Korolkov(ro, 1.0, p, vx, vy, vz, bx, by, bz, ro2, 1.0, p2, vx2, vy2, vz2, bx2, by2, bz2, P, PQ, n1, n2, n3, 1.0, 3, Vc, 0.0);
         
-        Vc = Vc * time * 0.3;  // 0.3
+        Vc = Vc * time * 0.6;  // 0.3
         //cout << Vc << endl;
 
         i->dvig1 = n1 * Vc;
@@ -4732,7 +4776,7 @@ void Setka::Start_MHD(int times)
                 {
                     this->Construct_start();
                     nmf = 0;
-                    bkl = false;
+                    bkl = true;
                 }
             } while (bkl == false);
         }
@@ -4807,8 +4851,8 @@ void Setka::Start_MHD(int times)
 
             for (auto& i : K->Grans)
             {
-                int mm = 2;                                                          // Метод 3 ---------------------------------------
-                /*if (fabs(z) > 8.0)
+                int mm = 3;                                                          // Метод 3 ---------------------------------------
+                /*if (fabs(z) > 6.0)
                 {
                     mm = 2;
                 }*/
@@ -4927,7 +4971,7 @@ void Setka::Start_MHD(int times)
 
                 // Приём для магнитных полей
                 double bx1 = bx, by1 = by, bz1 = bz;
-                if (normB)
+                if (false)//(normB)
                 {
                     if (K->couple_ == true && i->Sosed->couple_ == true)
                     {
@@ -5408,12 +5452,15 @@ void Setka::Zapusk(void)
 
     //this->Go_MHD(200000);
     //this->Save_setka("vers_2");
+    //this->Go_MHD(10000);
 
-    for (int i = 0; i < 10; i++)
+    this->Init();
+
+    for (int i = 0; i < 12; i++)
     {
         cout << "Cicle  " << i << endl;
-        this->Go_MHD(10000);
-        this->Start_MHD(350);
+        this->Start_MHD(500);
+        
         //this->Go_MHD(500);
         //this->Start_MHD(100);
         do
@@ -5432,8 +5479,12 @@ void Setka::Zapusk(void)
             cout << "reconstruct_4 = " << bkl << endl;
         } while (bkl == false);
 
+        //this->Go_MHD(10000);
+        this->Go_MHD(10000);
+
         this->Save_setka("vers_c");
     }
+
 
 }
 
@@ -5499,6 +5550,9 @@ void Setka::Init(void)
 
         i->Center->get(x, y, z);
         r = sqrt(kv(x) + kv(y) + kv(z));
+
+        //cout << x << "  " << y << "  " << z << "  " << r << endl;
+
         if (r < 1.3)
         {
             i->par[0].ro = 1.0 / (kv(chi) * kv(r));
@@ -5509,7 +5563,7 @@ void Setka::Init(void)
             double B = sqrt(4.0 * pi) / (MA * r);
             double the = acos(z / r);
             double AA, BB, CC;
-            double BR = 0.0;    // Br
+            double BR = sqrt(4.0 * pi) / (MA * 32.23 * sqrt(eta) * r * r);    // Br
             this->dekard_skorost(x, y, z, BR, B * sin(the), 0.0, AA, BB, CC);
             i->par[0].bx = AA;
             i->par[0].by = BB;
@@ -6529,7 +6583,7 @@ double Setka::HLLDQ_Korolkov(const double& ro_L, const double& Q_L, const double
         / (suR * ro_R - suL * ro_L);
 
     double UU = max(fabs(SL), fabs(SR));
-    double time = krit * rad / UU;
+    double time = krit * rad / (UU + fabs(wv));
 
     double FL[9], FR[9], UL[9], UR[9];
 
@@ -6793,9 +6847,9 @@ double Setka::HLLDQ_Korolkov(const double& ro_L, const double& Q_L, const double
             bmm1 = 0.0;
             ro_LL = ro_L;
             PTTL = pTL;
-            cout << "2252   jfhfghjieuye  LLL" << endl;
-            cout << ro_L << " " << p_L << " " << ro_R << " " << p_R << " " << v1_L << " " << v1_R << " " << Bx_L << " " << Bx_R << endl;
-            exit(-1);
+            //cout << "2252   jfhfghjieuye  LLL" << endl;
+            //cout << ro_L << " " << p_L << " " << ro_R << " " << p_R << " " << v1_L << " " << v1_R << " " << Bx_L << " " << Bx_R << endl;
+            //exit(-1);
         }
 
         if (fabs(ttR) >= 0.00001)
@@ -6815,7 +6869,7 @@ double Setka::HLLDQ_Korolkov(const double& ro_L, const double& Q_L, const double
             bmm2 = 0.0;
             ro_RR = ro_R;
             PTTR = pTR;
-            cout << "2272   jfhfghjieuye  RRR" << endl;
+            //cout << "2272   jfhfghjieuye  RRR" << endl;
         }
 
         double eLL = (e1 * suL + PTTL * SM - pTL * u1 + bn * //              опять  bn  не тот !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
