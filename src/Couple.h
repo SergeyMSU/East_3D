@@ -22,8 +22,12 @@ public:
 	double mo1 = 0.0;                   // ¬ектор сдвига дл€ парных €чеек
 	double mo2 = 0.0;                   // ¬ектор сдвига дл€ парных €чеек
 	double mo3 = 0.0;                   // ¬ектор сдвига дл€ парных €чеек
+	double tension_x = 0.0;
+	double tension_y = 0.0;
+	double tension_z = 0.0;
 	double d_sosed;
 	int number = -1;
+	bool extern_boundary = false;            // √раничит ли €чейка с границей (внешней ил внутренней, не важно.
 
 	Couple(Cell* A1, Cell* A2, const double& dist);
 
