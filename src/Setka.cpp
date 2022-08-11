@@ -4366,14 +4366,31 @@ void Setka::Go_MHD(int times)
             this->vanish_bn(now1);
         }
 
+        // ќбнул€ем потоки
+#pragma omp parallel for
+        for (int ii = 0; ii < this->All_Cell.size(); ii++)
+        {
+            this->All_Cell[ii]->check_ = false;
+            this->All_Cell[ii]->Potok[0] = this->All_Cell[ii]->Potok[1] = this->All_Cell[ii]->Potok[2] = //
+                this->All_Cell[ii]->Potok[3] = this->All_Cell[ii]->Potok[4] = this->All_Cell[ii]->Potok[5] = //
+                this->All_Cell[ii]->Potok[6] = this->All_Cell[ii]->Potok[7] = this->All_Cell[ii]->Potok[8] = 0.0;
+            for (auto& kl : this->All_Cell[ii]->Grans)
+            {
+                kl->check_ = false;
+            }
+        }
+
 #pragma omp parallel for
         for(int ii = 0; ii < this->All_Cell.size(); ii++)
         {
             auto K = this->All_Cell[ii];
+            K->acces_POTOK.lock();
+            K->check_ = true;
 
             if (K->mgd_ == false)
             {
-                K->par[now2] = K->par[now1];                                                   
+                K->par[now2] = K->par[now1];  
+                K->acces_POTOK.unlock();
                 continue;
             }
 
@@ -4382,8 +4399,6 @@ void Setka::Go_MHD(int times)
             r = sqrt(kv(x) + kv(y) + kv(z));
             double P[8] = { 0.0 };
             P[0] = P[1] = P[2] = P[3] = P[4] = P[5] = P[6] = P[7] = 0.0;
-            double Potok[10] = { 0.0 };
-            Potok[0] = Potok[1] = Potok[2] = Potok[3] = Potok[4] = Potok[5] = Potok[6] = Potok[7] = Potok[8] = Potok[9] = 0.0;
             double tmin = 1000;
 			double S = 0.0; // ѕлощадь грани
             double ro = K->par[now1].ro;
@@ -4488,9 +4503,18 @@ void Setka::Go_MHD(int times)
             double bz1 = bz;
 
             int n_gran = -1;
+            int gran_protiv = -1;
+
             for (auto& i : K->Grans)
             {
+                gran_protiv = -1;
                 n_gran++;
+
+                if (i->check_ == true)
+                {
+                    continue;
+                }
+
                 int mm = 3;                                                          // ћетод 3 ---------------------------------------
                 /*if (fabs(z) > 6.0)
                 {
@@ -4517,7 +4541,7 @@ void Setka::Go_MHD(int times)
                         Parametr pp1, pp2;
                         
 
-                        K->Get_TVD_Param(i, pp1, pp2, now1, n_gran, false);
+                        gran_protiv = K->Get_TVD_Param(i, pp1, pp2, now1, n_gran, false);
                         
 
                         ro1 = pp1.ro;
@@ -4621,7 +4645,7 @@ void Setka::Go_MHD(int times)
 
                 dist = sqrt(kv(x2 - x) + kv(y2 - y) + kv(z2 - z)) / 2.0;
                 sks = n1 * (bx1 + bx2) / 2.0 + n2 * (by1 + by2) / 2.0 + n3 * (bz1 + bz2) / 2.0;
-                Potok[8] = Potok[8] + sks * S;
+                K->Potok[8] = K->Potok[8] + sks * S;
                 /*if (r < 1.4)
                 {
                     mm = 1;
@@ -4638,27 +4662,45 @@ void Setka::Go_MHD(int times)
                 }
                 for (int k = 0; k < 8; k++)  // —уммируем все потоки в €чейке
                 {
-                    Potok[k] = Potok[k] + P[k] * S;
+                    K->Potok[k] = K->Potok[k] + P[k] * S;
+                }
+
+                if (gran_protiv > -1)
+                {
+                    if (i->Sosed->check_ == false)
+                    {
+                        if (i->Sosed->Grans[gran_protiv]->check_ == false)
+                        {
+                            i->Sosed->acces_POTOK.lock();
+                            i->Sosed->Grans[gran_protiv]->check_ = true;
+                            i->Sosed->Potok[8] = i->Sosed->Potok[8] - sks * S;
+                            for (int k = 0; k < 8; k++)  // —уммируем все потоки в €чейке
+                            {
+                                i->Sosed->Potok[k] = i->Sosed->Potok[k] - P[k] * S;
+                            }
+                            i->Sosed->acces_POTOK.unlock();
+                        }
+                    }
                 }
 
             }
 
             double ro3, p3, u3, v3, w3, bx3, by3, bz3;
 
-            ro3 = ro - T[now1] * Potok[0] / Volume;
+            ro3 = ro - T[now1] * K->Potok[0] / Volume;
             if (ro3 <= 0.0)
             {
                 printf("ERROR -  dssdbfhfshjskfutytqqazz\n");
                 printf("%lf, %lf, %lf, %lf\n", x, y, z, ro3);
                 ro3 = 0.0001;
             }
-            u3 = (ro * vx - T[now1] * (Potok[1] + (bx / cpi4) * Potok[8]) / Volume) / ro3;
-            v3 = (ro * vy - T[now1] * (Potok[2] + (by / cpi4) * Potok[8]) / Volume) / ro3;
-            w3 = (ro * vz - T[now1] * (Potok[3] + (bz / cpi4) * Potok[8]) / Volume) / ro3;
-            bx3 = (bx - T[now1] * (Potok[4] + vx * Potok[8]) / Volume);
-            by3 = (by - T[now1] * (Potok[5] + vy * Potok[8]) / Volume);
-            bz3 = (bz - T[now1] * (Potok[6] + vz * Potok[8]) / Volume);
-            p3 = ((U8(ro, p, vx, vy, vz, bx, by, bz) - T[now1] * (Potok[7] + (skk(vx, vy, vz, bx, by, bz) / cpi4) * Potok[8])//
+            u3 = (ro * vx - T[now1] * (K->Potok[1] + (bx / cpi4) * K->Potok[8]) / Volume) / ro3;
+            v3 = (ro * vy - T[now1] * (K->Potok[2] + (by / cpi4) * K->Potok[8]) / Volume) / ro3;
+            w3 = (ro * vz - T[now1] * (K->Potok[3] + (bz / cpi4) * K->Potok[8]) / Volume) / ro3;
+            bx3 = (bx - T[now1] * (K->Potok[4] + vx * K->Potok[8]) / Volume);
+            by3 = (by - T[now1] * (K->Potok[5] + vy * K->Potok[8]) / Volume);
+            bz3 = (bz - T[now1] * (K->Potok[6] + vz * K->Potok[8]) / Volume);
+            p3 = ((U8(ro, p, vx, vy, vz, bx, by, bz) - T[now1] * (K->Potok[7] + (skk(vx, vy, vz, bx, by, bz) / cpi4) * K->Potok[8])//
                 / Volume) - 0.5 * ro3 * kvv(u3, v3, w3) - kvv(bx3, by3, bz3) / cpi8) * (ggg - 1.0);
 
             if (p3 <= 0)
@@ -4684,6 +4726,7 @@ void Setka::Go_MHD(int times)
             }
 
             K->TVD_reconstruct = false;
+            K->acces_POTOK.unlock();
         }
 
         ow1 = now1;

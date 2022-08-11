@@ -19,6 +19,7 @@ public:
 	double c2 = 0.0;
 	double c3 = 0.0;
 	double dl = 0.0;
+	bool check_ = false;
 
 	Gran();
 
