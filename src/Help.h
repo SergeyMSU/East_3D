@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fstream>
+#include <algorithm>
 #include "voro++.hh"
 
 #include "Cell.h"
@@ -14,6 +15,11 @@
 #include "Setka.h"
 #include "Gran.h"
 #include "Couple.h"
+
+double linear(const double& x1, const double& t1, const double& x2, const double& t2, const double& x3, const double& t3, const double& y);
+double linear(const double& x1, const double& t1, const double& x2, const double& t2, const double& y);
+double minmod(const double& x, const double& y);
+double sign(const double& x);
 
 
 #define kv(x) ( (x)*(x) )
@@ -51,13 +57,17 @@
 #define RR_ 1.0                   // Характерный размер задачи  (т.е. все сетка занимает несколько таких размеров)
 
 #define chi 2.0  // 32.2305
-#define MA 12.0
+#define MA 12.9345
 #define eta 150.0
 #define M_inf 0.05
 #define betta 4.2426
 
 #define normB true           // Нужно ли вычитать нормальную компоненту магнитного поля на контакте?
+#define TVD_ true
 #define  tens_ 0.003            // Коэффициент натяжения поверхности
+
+#define eta_ 0.5    // параметр точности
+#define betta_ 1.0  // сжатие
 
 
 template <typename T> int sgn(T val) {
@@ -67,3 +77,6 @@ template <typename T> int sgn(T val) {
 template <typename T> int sign(T val) {
     return (T(0) < val) - (val < T(0));
 }
+
+
+

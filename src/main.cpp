@@ -58,7 +58,7 @@ int main()
 		//sleep(7200);
 		cout << "NOT SLEEP" << endl;
 
-		Setka B = Setka("vers_28");  // 19  до bn
+		Setka B = Setka("vers_31");  // 19  до bn
 
 		B.Initialization_do_MHD();
 
@@ -225,7 +225,7 @@ int main()
 
 
 		B.Zapusk();
-		B.Save_setka("vers_29");
+		//B.Save_setka("vers_32");
 		//B.Construct_start();
 
 		B.Cut_Plane_z(1.0);

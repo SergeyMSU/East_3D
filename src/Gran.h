@@ -21,5 +21,8 @@ public:
 	double dl = 0.0;
 
 	Gran();
+
+	void set_normal(const double& a, const double& b, const double& c);
+	void get_normal(double& a, double& b, double& c);
 };
 

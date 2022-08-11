@@ -44,7 +44,8 @@ public:
 	//map <int, Gran*> Grans_do;     // Грани до добавления новых (нужно для расчёта перемещения грани)
 	vector <Cell*> Candidates;         //  Реальные грани с соседями и площадью грани и нормалью
 	vector <Gran*> Grans;         //  Реальные грани с соседями и площадью грани и нормалью
-	vector <Cell*> Grans_TVD;         //  Ячейки - противоположенные к каждой грани
+	vector <Gran*> Grans_TVD;         //  Ячейки - противоположенные к каждой грани
+	vector <Cell*> Grans_standart;         //  Ячейки - противоположенные к каждой грани
 	// Эти грани задаются при первоначальном декартовом построении сетки, их не нужно никогда менять
 	// Более того, если их "потерять" то восстановить уже не получится.
 	// Введены для возможности возврата ячейки, которая была удалена из сетки.
@@ -56,6 +57,8 @@ public:
 	double move1;                   // Вектор сдвига для парных ячеек
 	double move2;                   // Вектор сдвига для парных ячеек
 	double move3;                   // Вектор сдвига для парных ячеек
+
+	mutex acces_TVD;
 
 	
 
@@ -82,12 +85,19 @@ public:
 	bool i_delete = false;                 // Нужно ли удалить ячейку?
 
 	bool extern_boundary = false;            // Граничит ли ячейка с границей (внешней ил внутренней, не важно.
+
+	bool TVD_reconstruct = false;                 // Нужно ли пересчитывать ТВД?
 	
 
 	Cell(const double& x, const double& y, const double& z);  // Конструктор сам создаёт центр ячейки в памети и сохраняет указатель на него
 	void set_Volume(const double& V);
 	void get_Volume(double& V);
 	void get_Volume_do(double& V);
+
+	// Работа с ТВД
+	bool Get_TVD(Gran* G, Gran*& A);
+	int Get_TVD_Param(Gran* G, Parametr& p1, Parametr& p2, int now, int n_gran, bool bnkl = false);
+	// Ищет снесённые значения из данной ячейки на грань G, при этом A - сосед "сзади", т.е. со стороны самой ячейки
 
 
 private:

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <omp.h>
 #include <iomanip>      // std::setprecision
+#include <time.h> 
 
 using namespace std;
 using namespace voro;
@@ -2244,6 +2245,7 @@ bool Setka::Reconstruct_medium4(bool wide)
     {
         if (i->include_ == true)
         {
+            i->TVD_reconstruct = false;
             double x, y, z, r, dd, nx, ny, nz;
             double A, B, C;
             voronoicell_neighbor c;
@@ -2327,6 +2329,7 @@ bool Setka::Reconstruct_medium4(bool wide)
             // Вычисляем движение для пар
             if (i->couple_ == true && wide == true)
             {
+                i->TVD_reconstruct = true;
                 i->move1 = i->move2 = i->move3 = 0.0;
                 double kkk = 1.0;
                 double nor = 1.0;
@@ -2433,6 +2436,12 @@ bool Setka::Reconstruct_medium4(bool wide)
                 A->n2 = norm[j * 3 + 1];
                 A->n3 = norm[j * 3 + 2];
 
+                if (A->S < 0.0000000001)
+                {
+                    delete A;
+                    continue;
+                }
+
                 
                 if (ney[j] >= 0)
                 {
@@ -2491,6 +2500,7 @@ bool Setka::Reconstruct_medium4(bool wide)
             if (bnl != i->Grans.size() || bnl2 != bnk2)
             {
                 bkl = false;
+                i->TVD_reconstruct = true;
             }
 
         }
@@ -3132,6 +3142,26 @@ void Setka::move_par(void)
         i->move(m1 * 0.0003, m2 * 0.0003, m3 * 0.0003);   // 0.0007 с Коэффициент нужен для замедления движения, иначе оно слишком большое
     }
 
+}
+
+void Setka::vanish_bn(int now1)
+{
+    for (auto& ii : this->All_Couple)
+    {
+        double n1, n2, n3;
+        ii->get_normal(n1, n2, n3);
+        double nm;
+
+        nm = ii->A1->par[now1].bx* n1 + ii->A1->par[now1].by * n2 + ii->A1->par[now1].bz * n3;
+        ii->A1->par[now1].bx = ii->A1->par[now1].bx - nm * n1;
+        ii->A1->par[now1].by = ii->A1->par[now1].by - nm * n2;
+        ii->A1->par[now1].bz = ii->A1->par[now1].bz - nm * n3;
+
+        nm = ii->A2->par[now1].bx * n1 + ii->A2->par[now1].by * n2 + ii->A2->par[now1].bz * n3;
+        ii->A2->par[now1].bx = ii->A2->par[now1].bx - nm * n1;
+        ii->A2->par[now1].by = ii->A2->par[now1].by - nm * n2;
+        ii->A2->par[now1].bz = ii->A2->par[now1].bz - nm * n3;
+    }
 }
 
 void Setka::Calc_normal(void)
@@ -4074,8 +4104,26 @@ void Setka::Initialization_do_MHD(void)
 {
     cout << "Initialization_do_MHD" << endl;
 
+    // Заполним грани нормалями на всякий
     for (auto& i : this->All_Cell)
     {
+        double x, y, z;
+        i->Center->get(x, y, z);
+        for (auto& j : i->Grans)
+        {
+            if (j->Sosed != nullptr && j->Sosed->type == C_base)
+            {
+                double x1, y1, z1;
+                double a1, a2, a3, aa;
+                j->Sosed->Center->get(x1, y1, z1);
+                a1 = x1 - x;
+                a2 = y1 - y;
+                a3 = z1 - z;
+                aa = sqrt(kvv(a1, a2, a3));
+                j->set_normal(a1 / aa, a2 / aa, a3 / aa);
+            }
+        }
+
         if (i->include_ == false)
         {
             continue;
@@ -4312,10 +4360,17 @@ void Setka::Go_MHD(int times)
         now2 = (now2 + 1) % 2; // Какие параметры сейчас меняем
         T[now2] = 100000000;
 
+        // Нужно обнулить нормальную компоненту поля для всех граничных ячеек!! Иначе ТВД процедура будет работать не правильно
+        if (normB)
+        {
+            this->vanish_bn(now1);
+        }
+
 #pragma omp parallel for
         for(int ii = 0; ii < this->All_Cell.size(); ii++)
         {
             auto K = this->All_Cell[ii];
+
             if (K->mgd_ == false)
             {
                 K->par[now2] = K->par[now1];                                                   
@@ -4342,37 +4397,191 @@ void Setka::Go_MHD(int times)
             double Volume = 0.0;
             K->get_Volume(Volume);
 
+            if (TVD_ == true)
+            {
+                K->acces_TVD.lock();
+                K->Grans_TVD.resize(K->Grans.size(), nullptr);
+                K->acces_TVD.unlock();
+
+                if (false)//(K->number == 600056)
+                {
+                    for (auto& iii : K->Grans_TVD)
+                    {
+                        if (iii == nullptr)
+                        {
+                            cout << -1 << " ";
+                        }
+                        else
+                        {
+                            cout << iii->Sosed->number << " ";
+                        }
+                    }
+                    cout << endl << endl;
+
+                    for (int kl = 0; kl < K->Grans.size(); kl++)
+                    {
+                        /*double x2, y2, z2;
+                        K->Grans[kl]->Sosed->Center->get(x2, y2, z2);
+                        cout << x2 << " " << y2 << " " << z2 << " " << K->Grans[kl]->Sosed->type << endl;*/
+
+                        if (K->Grans_TVD[kl] == nullptr)
+                        {
+                            cout << -100 << endl;
+                        }
+                        else
+                        {
+                            double x2, y2, z2;
+                            double x3, y3, z3;
+                            K->Grans_TVD[kl]->Sosed->Center->get(x2, y2, z2);
+                            K->Grans[kl]->Sosed->Center->get(x3, y3, z3);
+                            double u1, u2, u3, nn;
+                            double v1, v2, v3;
+                            u1 = x3 - x;
+                            u2 = y3 - y;
+                            u3 = z3 - z;
+                            nn = sqrt(kvv(u1, u2, u3));
+                            u1 = u1 / nn;
+                            u2 = u2 / nn;
+                            u3 = u3 / nn;
+                            v1 = x - x2;
+                            v2 = y - y2;
+                            v3 = z - z2;
+                            nn = sqrt(kvv(v1, v2, v3));
+                            v1 = v1 / nn;
+                            v2 = v2 / nn;
+                            v3 = v3 / nn;
+                            cout << u1 * v1 + u2 * v2 + u3 * v3 << "  ";
+                        }
+                    }
+                    cout << endl << endl;
+
+                    /*for (int kl = 0; kl < K->Grans.size(); kl++)
+                    {
+                        if (K->Grans_TVD[kl] == nullptr)
+                        {
+                            cout << -100 << endl;;
+                        }
+                        else
+                        {
+                            double x2, y2, z2;
+                            K->Grans_TVD[kl]->Center->get(x2, y2, z2);
+                            
+                            cout << x2 << " " << y2 << " " << z2 << endl;;
+                        }
+                    }
+                    cout << endl << endl << endl;*/
+                }
+            }
+
             double ro2, p2, vx2, vy2, vz2, bx2, by2, bz2, sks, dist;
 
             double n1, n2, n3, nn;
             double x2, y2, z2;
 
+            double ro1 = ro;
+            double p1 = p;
+            double vx1 = vx;
+            double vy1 = vy;
+            double vz1 = vz;
+            double bx1 = bx;
+            double by1 = by;
+            double bz1 = bz;
+
+            int n_gran = -1;
             for (auto& i : K->Grans)
             {
+                n_gran++;
                 int mm = 3;                                                          // Метод 3 ---------------------------------------
                 /*if (fabs(z) > 6.0)
                 {
                     mm = 2;
                 }*/
                 double ro2, p2, vx2, vy2, vz2, bx2, by2, bz2;
+                S = i->S;
+                n1 = i->n1;
+                n2 = i->n2;
+                n3 = i->n3;
                 
                 if (r < 1.5)
                 {
                     mm = 2;
                 }
+
+
                 
                 i->Sosed->Center->get(x2, y2, z2);
                 if (i->Sosed->type == C_base)
                 {
-                    ro2 = i->Sosed->par[now1].ro;
-                    p2 = i->Sosed->par[now1].p;
-                    vx2 = i->Sosed->par[now1].u;
-                    vy2 = i->Sosed->par[now1].v;
-                    vz2 = i->Sosed->par[now1].w;
-                    bx2 = i->Sosed->par[now1].bx;
-                    by2 = i->Sosed->par[now1].by;
-                    bz2 = i->Sosed->par[now1].bz;
+                    if (TVD_ == true)
+                    {
+                        Parametr pp1, pp2;
+                        
 
+                        K->Get_TVD_Param(i, pp1, pp2, now1, n_gran, false);
+                        
+
+                        ro1 = pp1.ro;
+                        p1 = pp1.p;
+                        vx1 = pp1.u;
+                        vy1 = pp1.v;
+                        vz1 = pp1.w;
+                        bx1 = pp1.bx;
+                        by1 = pp1.by;
+                        bz1 = pp1.bz;
+
+                        ro2 = pp2.ro;
+                        p2 = pp2.p;
+                        vx2 = pp2.u;
+                        vy2 = pp2.v;
+                        vz2 = pp2.w;
+                        bx2 = pp2.bx;
+                        by2 = pp2.by;
+                        bz2 = pp2.bz;
+
+                        // Приём для магнитных полей
+                        if (normB)
+                        {
+                            if (K->couple_ == true && i->Sosed->couple_ == true)
+                            {
+                                if (K->Par->A1->number == i->Sosed->number || K->Par->A2->number == i->Sosed->number)
+                                {
+                                    double nm;
+                                    nm = bx * n1 + by * n2 + bz * n3;
+                                    bx1 = bx1 - nm * n1;
+                                    by1 = by1 - nm * n2;
+                                    bz1 = bz1 - nm * n3;
+
+                                    nm = bx2 * n1 + by2 * n2 + bz2 * n3;
+                                    bx2 = bx2 - nm * n1;
+                                    by2 = by2 - nm * n2;
+                                    bz2 = bz2 - nm * n3;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        ro2 = i->Sosed->par[now1].ro;
+                        p2 = i->Sosed->par[now1].p;
+                        vx2 = i->Sosed->par[now1].u;
+                        vy2 = i->Sosed->par[now1].v;
+                        vz2 = i->Sosed->par[now1].w;
+                        bx2 = i->Sosed->par[now1].bx;
+                        by2 = i->Sosed->par[now1].by;
+                        bz2 = i->Sosed->par[now1].bz;
+
+                        ro1 = ro;
+                        p1 = p;
+                        vx1 = vx;
+                        vy1 = vy;
+                        vz1 = vz;
+                        bx1 = bx;
+                        by1 = by;
+                        bz1 = bz;
+                    }
+
+
+                    // Для уменьшения неустойчивости
                     if (K->couple_ == true && i->Sosed->couple_ == true)
                     {
                         if (K->n_cop == i->Sosed->n_cop)
@@ -4410,42 +4619,8 @@ void Setka::Go_MHD(int times)
 
                 }
 
-                // Приём для магнитных полей
-                double bx1 = bx, by1 = by, bz1 = bz;
-                if (normB)
-                {
-                    if (K->couple_ == true && i->Sosed->couple_ == true)
-                    {
-                        if (K->Par->A1->number == i->Sosed->number || K->Par->A2->number == i->Sosed->number)
-                        {
-                            double nm;
-                            nm = bx * n1 + by * n2 + bz * n3;
-                            bx1 = bx1 - nm * n1;
-                            by1 = by1 - nm * n2;
-                            bz1 = bz1 - nm * n3;
-
-                            nm = bx2 * n1 + by2 * n2 + bz2 * n3;
-                            bx2 = bx2 - nm * n1;
-                            by2 = by2 - nm * n2;
-                            bz2 = bz2 - nm * n3;
-
-                            i->Sosed->par[now1].bx = bx2;
-                            i->Sosed->par[now1].by = by2;
-                            i->Sosed->par[now1].bz = bz2;
-
-                            K->par[now1].bx = bx1;
-                            K->par[now1].by = by1;
-                            K->par[now1].bz = bz1;
-                        }
-                    }
-                }
-
-                S = i->S;
-                n1 = i->n1;
-                n2 = i->n2;
-                n3 = i->n3;
                 dist = sqrt(kv(x2 - x) + kv(y2 - y) + kv(z2 - z)) / 2.0;
-                sks = n1 * (bx + bx2) / 2.0 + n2 * (by + by2) / 2.0 + n3 * (bz + bz2) / 2.0;
+                sks = n1 * (bx1 + bx2) / 2.0 + n2 * (by1 + by2) / 2.0 + n3 * (bz1 + bz2) / 2.0;
                 Potok[8] = Potok[8] + sks * S;
                 /*if (r < 1.4)
                 {
@@ -4455,11 +4630,11 @@ void Setka::Go_MHD(int times)
                 double Vc;
                 if (mm == 3 || mm == 2)
                 {
-                    tmin = min(tmin, HLLDQ_Korolkov(ro, 1.0, p, vx, vy, vz, bx1, by1, bz1, ro2, 1.0, p2, vx2, vy2, vz2, bx2, by2, bz2, P, PQ, n1, n2, n3, dist, mm, Vc));
+                    tmin = min(tmin, HLLDQ_Korolkov(ro1, 1.0, p1, vx1, vy1, vz1, bx1, by1, bz1, ro2, 1.0, p2, vx2, vy2, vz2, bx2, by2, bz2, P, PQ, n1, n2, n3, dist, mm, Vc));
                 }
                 else
                 {
-                    tmin = min(tmin, HLLD_Alexashov(ro, p, vx, vy, vz, bx1, by1, bz1, ro2, p2, vx2, vy2, vz2, bx2, by2, bz2, P, n1, n2, n3, dist, mm, Vc));
+                    tmin = min(tmin, HLLD_Alexashov(ro1, p1, vx1, vy1, vz1, bx1, by1, bz1, ro2, p2, vx2, vy2, vz2, bx2, by2, bz2, P, n1, n2, n3, dist, mm, Vc));
                 }
                 for (int k = 0; k < 8; k++)  // Суммируем все потоки в ячейке
                 {
@@ -4508,6 +4683,7 @@ void Setka::Go_MHD(int times)
                 mut.unlock();
             }
 
+            K->TVD_reconstruct = false;
         }
 
         ow1 = now1;
@@ -4746,7 +4922,7 @@ void Setka::Start_MHD(int times)
         now2 = (now2 + 1) % 2; // Какие параметры сейчас меняем
         T[now2] = 100000000;
 
-       
+        // ВАЖНО ИСПРАВИТЬ ОБЪЁМЫ!!!  и предыдущие центры!
         
         this->Culc_couple(now1, T[now1]);    // Считаем движение пар из задачи о распаде разрыва!!!
         //this->Reconstruct_medium3(true);
@@ -5440,7 +5616,7 @@ void Setka::Zapusk(void)
         cout << "reconstruct_4 = " << bkl << endl;
     } while (bkl == false);
     cout << " 22222222  " << endl;
-    this->Rebuild();
+    //this->Rebuild();
 
     this->Initialization_do_MHD();
     cout << " 33333333  " << endl;
@@ -5456,7 +5632,18 @@ void Setka::Zapusk(void)
 
     this->Init();
 
-    for (int i = 0; i < 12; i++)
+    time_t start, end;
+    this->Initialization_do_MHD();
+
+    time(&start);
+    this->Go_MHD(5000);
+    time(&end);
+
+    double seconds = difftime(end, start);
+    printf("The time: %lf minut\n", seconds/60.0);
+
+
+    for (int i = 0; i < 0; i++)
     {
         cout << "Cicle  " << i << endl;
         this->Start_MHD(500);
