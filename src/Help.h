@@ -60,7 +60,7 @@ double sign(const double& x);
 #define MA 12.9345
 #define eta 150.0
 #define M_inf 0.05
-#define betta 4.2426
+#define betta 0.0
 
 #define normB true           // Ќужно ли вычитать нормальную компоненту магнитного пол€ на контакте?
 #define TVD_ true

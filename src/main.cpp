@@ -54,11 +54,11 @@ int main()
 {
 	if (true)
 	{
-		cout << "SLEEP" << endl;
+		cout << "SLEEP  sec" << endl;
 		//sleep(7200);
 		cout << "NOT SLEEP" << endl;
 
-		Setka B = Setka("vers_31");  // 19  до bn
+		Setka B = Setka("vers_33");  // 19  до bn
 
 		B.Initialization_do_MHD();
 
@@ -225,7 +225,7 @@ int main()
 
 
 		B.Zapusk();
-		//B.Save_setka("vers_32");
+		B.Save_setka("vers_34");
 		//B.Construct_start();
 
 		B.Cut_Plane_z(1.0);
